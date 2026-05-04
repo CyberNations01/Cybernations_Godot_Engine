@@ -322,7 +322,11 @@ public sealed class MainUiPresenter : IDisposable
 			return;
 		}
 
-		_chatPanelView.SetMessages(payload.chat_messages ?? Array.Empty<ChatMessageVm>());
+		if (payload.chat_messages is { Length: > 0 } chatMessages)
+		{
+			_chatPanelView.SetMessages(chatMessages);
+		}
+
 		if (payload.team_goal.HasValue)
 		{
 			var teamGoal = payload.team_goal.Value;
@@ -649,7 +653,7 @@ public sealed class MainUiPresenter : IDisposable
 			_chatPanelView.AddMessage(
 				new ChatMessageVm(
 					"DEV",
-					"Developer mode activated. Enter REST commands like GET /state. Use /dev deactivate to exit."
+					"Developer mode activated. Enter REST commands like GET /state, or /random simulation for local fake server JSON. Use /dev deactivate to exit."
 				)
 			);
 			return true;

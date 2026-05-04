@@ -44,3 +44,4 @@ Entrance: `GET /state`, `POST /test/action`.
 2. Frontend read and pack current Json in `GamePacketCodec.cs` with `JsonSerializer.Deserialize<T>()` (envelope and payload). `MainUiPresenter` then uses the payload to update the layouts.
 3. `REST` mode is not a proactive push. Frontend use `/state` to demand a update and `/test/action` after every player action.
 4. Chat pannel now can accept `/dev activate` and `/dev deactivate` to change the game in/out developer mode. In this mode you can use `GET /state`, `POST /test/action {"phase":"ENVISION","playerId":0,"type":"pass"}` as in the server.
+5. A test command `/random simulation` is added into dev mode. It runs without the server but simulates the Json feedback and update frontend layouts with it.

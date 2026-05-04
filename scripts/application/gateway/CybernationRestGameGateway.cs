@@ -120,6 +120,14 @@ public sealed class CybernationRestGameGateway : IGameGateway
 			return;
 		}
 
+		if (IsRandomSimulationCommand(payload.command))
+		{
+			var simulationJson = BuildRandomSimulationServerJson();
+			EmitTranslatedServerState(envelope, simulationJson, "Developer random simulation applied.", 0);
+			EmitDevConsoleResult(envelope, payload.command, true, 200, simulationJson);
+			return;
+		}
+
 		if (!TryBuildDevConsoleRequest(payload.command, out var request, out var error))
 		{
 			EmitDevConsoleResult(envelope, payload.command, false, 0, error);
@@ -133,12 +141,13 @@ public sealed class CybernationRestGameGateway : IGameGateway
 			{
 				var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 				var statusCode = (int)response.StatusCode;
-				EmitDevConsoleResult(envelope, payload.command, response.IsSuccessStatusCode, statusCode, PrettyPrintJsonIfPossible(body));
 
 				if (response.IsSuccessStatusCode && IsGetStateCommand(payload.command))
 				{
 					EmitTranslatedServerState(envelope, body, "Developer console refreshed state.", 0);
 				}
+
+				EmitDevConsoleResult(envelope, payload.command, response.IsSuccessStatusCode, statusCode, PrettyPrintJsonIfPossible(body));
 			}
 		}
 		catch (Exception ex)
@@ -652,6 +661,121 @@ public sealed class CybernationRestGameGateway : IGameGateway
 	{
 		var normalized = command.Trim();
 		return normalized.Equals("GET /state", StringComparison.OrdinalIgnoreCase);
+	}
+
+	private static bool IsRandomSimulationCommand(string command)
+	{
+		var normalized = command.Trim();
+		return normalized.Equals("/random simulation", StringComparison.OrdinalIgnoreCase);
+	}
+
+	private static string BuildRandomSimulationServerJson()
+	{
+		var random = Random.Shared;
+		var conflict = random.Next(0, 8);
+		var maxResource = Math.Max(0, 25 - conflict);
+		var playerCount = random.Next(3, 6);
+		var currentPlayerId = random.Next(0, playerCount);
+		var passedPlayers = new List<int>();
+		var players = new List<object>(playerCount);
+
+		for (var id = 0; id < playerCount; id++)
+		{
+			var passedThisTurn = id != currentPlayerId && random.NextDouble() < 0.45;
+			if (passedThisTurn)
+			{
+				passedPlayers.Add(id);
+			}
+
+			players.Add(new
+			{
+				id,
+				isFirstPlayer = id == 0,
+				handSize = random.Next(0, 8),
+				passedThisTurn,
+				progress = $"{random.Next(0, 101)}.{random.Next(0, 10)}%",
+			});
+		}
+
+		var stackTypes = new[] { "Wild", "Wild", "Wild", "Waste", "DevA", "DevB" };
+		var board = new List<object>(11);
+		for (var position = 0; position < 11; position++)
+		{
+			board.Add(new
+			{
+				position,
+				type = stackTypes[random.Next(0, stackTypes.Length)],
+			});
+		}
+
+		var phases = new[] { "ENVISION", "TRAVERSE", "ADOPT" };
+		var root = new
+		{
+			status = 0,
+			message = new
+			{
+				payload = "Random simulation JSON generated locally in developer mode.",
+			},
+			gameState = new
+			{
+				ignoreCohesionLossThisRound = random.NextDouble() < 0.2,
+				activeGoal = new
+				{
+					id = random.Next(1, 6),
+					name = "Random Simulation Goal",
+					met = random.NextDouble() < 0.35,
+				},
+				@params = new
+				{
+					cohesion = random.Next(0, 101),
+					cybernationLevel = random.Next(1, 16),
+					humanRelation = random.Next(0, maxResource + 1),
+					environment = random.Next(0, maxResource + 1),
+					technology = random.Next(0, maxResource + 1),
+				},
+				conflict,
+				board,
+				pool = new
+				{
+					turnWild = random.Next(0, 6),
+					loseCohesion = random.Next(0, 6),
+					turnWaste = random.Next(0, 6),
+					solveDisruption = random.Next(0, 6),
+					develop = random.Next(0, 6),
+					transform = random.Next(0, 6),
+					totalRemaining = random.Next(0, 31),
+				},
+				tokenBagCount = random.Next(0, 31),
+				adapt = new
+				{
+					trackSize = random.Next(0, 8),
+					cursor = random.Next(0, 8),
+					complete = random.NextDouble() < 0.25,
+				},
+				players,
+				activeDisruption = random.NextDouble() < 0.5
+					? null
+					: new
+					{
+						name = "Random Disruption",
+						category = "simulation",
+						cancellable = random.NextDouble() < 0.5,
+					},
+			},
+			controller = new
+			{
+				round = random.Next(1, 7),
+				phase = phases[random.Next(0, phases.Length)],
+				currentPlayerId,
+				passedPlayers,
+				gameOver = false,
+			},
+		};
+
+		return JsonSerializer.Serialize(root, new JsonSerializerOptions
+		{
+			WriteIndented = true,
+		});
 	}
 
 	private static string PrettyPrintJsonIfPossible(string body)
