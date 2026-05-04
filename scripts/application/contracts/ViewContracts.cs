@@ -81,6 +81,21 @@ public interface IHiveBoardView
 	void ApplyTiles(IReadOnlyList<BoardTileVm> tiles);
 }
 
+public interface IResourceTracksView
+{
+	void SetResources(int human, int technology, int environment, int conflict);
+}
+
+public interface INationLevelBadgeView
+{
+	void SetLevel(int level);
+}
+
+public interface ITurnDotsView
+{
+	void SetCompletedTurns(int completedTurns);
+}
+
 public interface IPlayerDetailPopupView
 {
 	event Action? CloseRequested;

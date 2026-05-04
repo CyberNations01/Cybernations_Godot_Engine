@@ -4,7 +4,7 @@
 
 ## 1. 主界面与架构协调
 
-- `MainUI.cs` 是整张 UI 的调度层。它在 `_Ready` 中取到 Chat、Team Goal、Info Summary、Hive Board、Player Panel、Player Detail、EnvisionController 等核心视图，负责把它们的弹窗统一挂到 `UIMain/Popups` 的 `_popupHost` 并监听各种事件（比如 `_envisionController.PopupOpened` / `PopupClosed`）来处理背景遮罩与栈的悬浮效果。它通过 `UseLoopbackGateway` 选择本地 Loopback 后端或 `WebSocketGameGateway`，并把视图、Presenter、Controller 连接起来。
+- `MainUI.cs` 是整张 UI 的调度层。它在 `_Ready` 中取到 Chat、Team Goal、Info Summary、Hive Board、Player Panel、Player Detail、EnvisionController 等核心视图，负责把它们的弹窗统一挂到 `UIMain/Popups` 的 `_popupHost` 并监听各种事件（比如 `_envisionController.PopupOpened` / `PopupClosed`）来处理背景遮罩与栈的悬浮效果。它通过 `GatewayMode` 选择 Cybernation REST server、Loopback 或 WebSocket，并把视图、Presenter、Controller 连接起来。
 - `MainUiPresenter.cs` 作为视图和游戏网关之间的中介：绑定视图事件（聊天提交、面板展开/关闭、玩家选择、Envision action 等）、初始化连接、发送 `GamePacketCodec` 构建的命令（快照请求、玩家详情、团队目标/信息摘要请求、Envision 行动），然后根据收到的事件（聊天同步、牌堆更新、Envision 状态）更新对应的视图或通过 `EnvisionController` 应用状态。
 
 ## 2. 聊天面板（`ChatPanelView.cs`）
@@ -44,7 +44,7 @@
 
 ## 8. 网络与协议管线
 
-- `MainUiPresenter` 依赖的 `IGameGateway` 有一个 WebSocket 实现（`WebSocketGameGateway.cs`）和一个 Loopback 实现（`LoopbackGameGateway.cs`），用于发送/接收 `GamePacketCodec` 编码的 JSON 包。Presenter 初始化时发送 snapshot 请求，服务器回应后通过解包更新聊天、团队目标、信息摘要、Hive board，并接收 `evt.envision.state` 驱动 Envision 弹窗。
+- `MainUiPresenter` 依赖的 `IGameGateway` 有一个 Cybernation REST adapter（`CybernationRestGameGateway.cs`）、一个 WebSocket 实现（`WebSocketGameGateway.cs`）和一个 Loopback 实现（`LoopbackGameGateway.cs`），用于发送/接收 `GamePacketCodec` 编码的 JSON 包。Presenter 初始化时发送 snapshot 请求，服务器回应后通过解包更新聊天、团队目标、信息摘要、Hive board，并接收 `evt.envision.state` 驱动 Envision 弹窗。
 - `GamePacketCodec` / `PacketTypes` / `ProtocolPackets` 定义了通信协议的结构，Presenter 也把玩家操作（聊天、团队目标请求、Envision action）反向打包成 `PacketTypes.Cmd*` 命令发给 Gateway。Envision 行动现在走统一的 `cmd.envision.action`，后端或 Loopback 返回 `evt.envision.state`，Presenter 再把它转换成 `EnvisionUiState` 交给 `EnvisionController` 处理。
 
 ## 9. 弹窗宿主与遮罩

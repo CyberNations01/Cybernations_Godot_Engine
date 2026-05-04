@@ -197,6 +197,8 @@ public sealed class LoopbackGameGateway : IGameGateway
 				currentPlayerId,
 				localPlayerId,
 				_envisionPlayers,
+				3,
+				0,
 				currentPlayer.people >= 1,
 				currentPlayer.environment >= 1,
 				currentPlayer.environment >= 2 || currentPlayer.people >= 2 || currentPlayer.technology >= 2,

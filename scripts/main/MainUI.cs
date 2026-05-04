@@ -138,6 +138,13 @@
 using Godot;
 using Cybernations.Scripts.Main.Components;
 
+public enum GameGatewayMode
+{
+	RestServer,
+	Loopback,
+	WebSocket,
+}
+
 public partial class MainUI : Control
 {
 	private MainUiPresenter _presenter = null!;
@@ -147,6 +154,9 @@ public partial class MainUI : Control
 	private TeamGoalPanelView _teamGoalPanelView = null!;
 	private InfoSummaryPanelView _infoSummaryPanelView = null!;
 	private HiveBoardView _hiveBoardView = null!;
+	private ResourceTracksView _resourceTracksView = null!;
+	private NationLevelBadgeView _nationLevelBadgeView = null!;
+	private TurnDotsView _turnDotsView = null!;
 	private PlayerPanelView _playerPanelView = null!;
 	private PlayerDetailPopupView _playerDetailPopupView = null!;
 
@@ -159,10 +169,10 @@ public partial class MainUI : Control
 	private Control _chatPanelRoot = null!;
 	private ColorRect _popupDimOverlay = null!;
 	[Export]
-	public bool UseLoopbackGateway { get; set; } = true;
+	public GameGatewayMode GatewayMode { get; set; } = GameGatewayMode.RestServer;
 
 	[Export]
-	public string ServerUrl { get; set; } = "ws://localhost:9999";
+	public string ServerUrl { get; set; } = "http://127.0.0.1:8080";
 
 	public override void _Ready()
 	{
@@ -173,6 +183,9 @@ public partial class MainUI : Control
 		_playerPanelView = GetNode<PlayerPanelView>("UIMain/PlayerPanel");
 		_playerDetailPopupView = GetNode<PlayerDetailPopupView>("UIMain/Popups/PlayerDetailPopup");
 		_hiveBoardView = GetNode<HiveBoardView>("World/GameBoard");
+		_resourceTracksView = GetNode<ResourceTracksView>("UIMain/ResourceTracks");
+		_nationLevelBadgeView = GetNode<NationLevelBadgeView>("UIMain/NationLevelBadge");
+		_turnDotsView = GetNode<TurnDotsView>("UIMain/TurnDots");
 		
 		_envisionController = GetNode<EnvisionController>("EnvisionController");
 		_chatPanelRoot = GetNode<Control>("UIMain/ChatPanel");
@@ -214,6 +227,9 @@ public partial class MainUI : Control
 			_teamGoalPanelView,
 			_infoSummaryPanelView,
 			_hiveBoardView,
+			_resourceTracksView,
+			_nationLevelBadgeView,
+			_turnDotsView,
 			_playerDetailPopupView,
 			_envisionController,
 			_gameGateway
@@ -272,10 +288,16 @@ private void RestoreBackground()
 
 	private IGameGateway CreateGameGateway()
 	{
-		if (!UseLoopbackGateway && !string.IsNullOrWhiteSpace(ServerUrl))
+		if (GatewayMode == GameGatewayMode.WebSocket)
 		{
 			GD.Print($"MainUI: using WebSocket game gateway at {ServerUrl}.");
 			return new WebSocketGameGateway(ServerUrl);
+		}
+
+		if (GatewayMode == GameGatewayMode.RestServer)
+		{
+			GD.Print($"MainUI: using Cybernation REST gateway at {ServerUrl}.");
+			return new CybernationRestGameGateway(ServerUrl);
 		}
 
 		GD.Print("MainUI: using loopback game gateway.");

@@ -58,6 +58,10 @@ grow_vertical = 2
 
 [node name="PlayerPanel" parent="UIMain" unique_id=1013420756 instance=ExtResource("3_yub1f")]
 anchors_preset = 0
+offset_left = 76.0
+offset_top = 38.0
+offset_right = 256.0
+offset_bottom = 798.0
 
 [node name="GlobalButtons" type="Control" parent="UIMain" unique_id=344067849]
 anchors_preset = 0

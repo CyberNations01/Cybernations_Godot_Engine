@@ -1,27 +1,65 @@
+using System;
 using Godot;
 
-public partial class ResourceTracksView : Control
+public partial class ResourceTracksView : Control, IResourceTracksView
 {
 	private const int TotalResourceCells = 25;
-	private const int ConflictCells = 3;
 
 	private readonly Color _inkColor = Color.FromHtml("#2B2726");
 	private readonly Color _iconFillColor = Color.FromHtml("#DFD7CE");
-	private readonly Color _emptyColor = Color.FromHtml("#D9D9D9");
-	private readonly Color _conflictColor = Color.FromHtml("#D46F6F");
+	private readonly Color _emptyColor = Color.FromHtml("#F4F4F4");
+	private readonly Color _conflictColor = Color.FromHtml("#2B2726");
+	private readonly Color _humanColor = Color.FromHtml("#C92CC1");
+	private readonly Color _technologyColor = Color.FromHtml("#3D29ED");
+	private readonly Color _environmentColor = Color.FromHtml("#6CE575");
+
+	[Export]
+	public int Human { get; set; } = 13;
+
+	[Export]
+	public int Technology { get; set; } = 10;
+
+	[Export]
+	public int Environment { get; set; } = 8;
+
+	[Export]
+	public int Conflict { get; set; } = 3;
 
 	public override void _Ready()
 	{
 		MouseFilter = MouseFilterEnum.Ignore;
 		Size = new Vector2(1010, 240);
 		CustomMinimumSize = Size;
-
-		AddChild(CreateTrackRow(new Vector2(0, 0), "H", 13, Color.FromHtml("#F4F4F4")));
-		AddChild(CreateTrackRow(new Vector2(0, 88), "T", 10, Color.FromHtml("#F4F4F4")));
-		AddChild(CreateTrackRow(new Vector2(0, 176), "E", 8, Color.FromHtml("#F4F4F4")));
+		Refresh();
 	}
 
-	private Control CreateTrackRow(Vector2 position, string iconText, int filledCells, Color filledColor)
+	public void SetResources(int human, int technology, int environment, int conflict)
+	{
+		Human = human;
+		Technology = technology;
+		Environment = environment;
+		Conflict = conflict;
+
+		if (IsNodeReady())
+		{
+			Refresh();
+		}
+	}
+
+	private void Refresh()
+	{
+		foreach (Node child in GetChildren())
+		{
+			RemoveChild(child);
+			child.QueueFree();
+		}
+
+		AddChild(CreateTrackRow(new Vector2(0, 0), new RowSpec("H", Human, _humanColor)));
+		AddChild(CreateTrackRow(new Vector2(0, 88), new RowSpec("T", Technology, _technologyColor)));
+		AddChild(CreateTrackRow(new Vector2(0, 176), new RowSpec("E", Environment, _environmentColor)));
+	}
+
+	private Control CreateTrackRow(Vector2 position, RowSpec rowSpec)
 	{
 		var row = new Control();
 		row.Position = position;
@@ -29,7 +67,7 @@ public partial class ResourceTracksView : Control
 
 		var iconBox = CreateRoundedPanel(Vector2.Zero, new Vector2(72, 72), _iconFillColor, 18);
 		row.AddChild(iconBox);
-		row.AddChild(CreateTextLabel(iconText, 28, Colors.Black, new Vector2(0, 18), new Vector2(72, 34), HorizontalAlignment.Center));
+		row.AddChild(CreateTextLabel(rowSpec.Label, 28, Colors.Black, new Vector2(0, 18), new Vector2(72, 34), HorizontalAlignment.Center));
 
 		const float trackStartX = 102.0f;
 		const float cellWidth = 28.0f;
@@ -38,13 +76,14 @@ public partial class ResourceTracksView : Control
 
 		for (int index = 0; index < TotalResourceCells; index++)
 		{
-			var state = ResolveCellState(index, filledCells);
+			var state = ResolveCellState(index, rowSpec.Value);
 			var cellColor = state switch
 			{
-				CellState.Filled => filledColor,
+				CellState.Filled => rowSpec.FillColor,
 				CellState.Conflict => _conflictColor,
 				_ => _emptyColor,
 			};
+			var borderColor = state == CellState.Conflict ? _conflictColor : _inkColor;
 
 			var radius = index == 0 || index == TotalResourceCells - 1 ? 14 : 4;
 			row.AddChild(
@@ -53,7 +92,7 @@ public partial class ResourceTracksView : Control
 					new Vector2(cellWidth, cellHeight),
 					cellColor,
 					radius,
-					_inkColor,
+					borderColor,
 					2
 				)
 			);
@@ -64,13 +103,15 @@ public partial class ResourceTracksView : Control
 
 	private CellState ResolveCellState(int index, int filledCells)
 	{
-		if (index >= TotalResourceCells - ConflictCells)
+		var conflictCells = Math.Clamp(Conflict, 0, TotalResourceCells);
+		if (index >= TotalResourceCells - conflictCells)
 		{
 			return CellState.Conflict;
 		}
 
-		var maxUsable = TotalResourceCells - ConflictCells;
-		return index < Mathf.Min(filledCells, maxUsable) ? CellState.Filled : CellState.Empty;
+		var maxUsable = TotalResourceCells - conflictCells;
+		var clampedFilledCells = Math.Clamp(filledCells, 0, maxUsable);
+		return index < clampedFilledCells ? CellState.Filled : CellState.Empty;
 	}
 
 	private static Panel CreateRoundedPanel(
@@ -132,4 +173,6 @@ public partial class ResourceTracksView : Control
 		Filled,
 		Conflict,
 	}
+
+	private readonly record struct RowSpec(string Label, int Value, Color FillColor);
 }

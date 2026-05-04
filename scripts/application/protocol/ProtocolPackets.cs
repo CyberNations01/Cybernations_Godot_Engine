@@ -82,6 +82,8 @@ public readonly record struct EnvisionStatePayload(
     int current_player_id,
     int local_player_id,
     EnvisionPlayerStatePayload[] players,
+    int conflict,
+    int completed_rounds,
     bool can_shift_power,
     bool can_come_together,
     bool can_connect,

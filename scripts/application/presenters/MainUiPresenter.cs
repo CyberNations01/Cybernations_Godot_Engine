@@ -12,6 +12,9 @@ public sealed class MainUiPresenter : IDisposable
 	private readonly ITeamGoalPanelView _teamGoalPanelView;
 	private readonly IInfoSummaryPanelView _infoSummaryPanelView;
 	private readonly IHiveBoardView _hiveBoardView;
+	private readonly IResourceTracksView _resourceTracksView;
+	private readonly INationLevelBadgeView _nationLevelBadgeView;
+	private readonly ITurnDotsView _turnDotsView;
 	private readonly IPlayerDetailPopupView _playerDetailPopupView;
 	private readonly IGameGateway _gateway;
 	private readonly Dictionary<int, Vector2> _pendingPlayerDetailPositions = [];
@@ -28,6 +31,9 @@ public sealed class MainUiPresenter : IDisposable
 		ITeamGoalPanelView teamGoalPanelView,
 		IInfoSummaryPanelView infoSummaryPanelView,
 		IHiveBoardView hiveBoardView,
+		IResourceTracksView resourceTracksView,
+		INationLevelBadgeView nationLevelBadgeView,
+		ITurnDotsView turnDotsView,
 		IPlayerDetailPopupView playerDetailPopupView,
 		EnvisionController envisionController,
 		IGameGateway gateway
@@ -37,6 +43,9 @@ public sealed class MainUiPresenter : IDisposable
 		_teamGoalPanelView = teamGoalPanelView;
 		_infoSummaryPanelView = infoSummaryPanelView;
 		_hiveBoardView = hiveBoardView;
+		_resourceTracksView = resourceTracksView;
+		_nationLevelBadgeView = nationLevelBadgeView;
+		_turnDotsView = turnDotsView;
 		_playerDetailPopupView = playerDetailPopupView;
 		_gateway = gateway;
 		_envisionController = envisionController;
@@ -418,6 +427,20 @@ public sealed class MainUiPresenter : IDisposable
 				Cohesion = player.cohesion,
 			};
 		}
+
+		if (players.Length > 0)
+		{
+			var resourceIndex = Math.Clamp(payload.current_player_id, 0, players.Length - 1);
+			var resourcePlayer = players[resourceIndex];
+			_resourceTracksView.SetResources(
+				resourcePlayer.People,
+				resourcePlayer.Technology,
+				resourcePlayer.Environment,
+				payload.conflict
+			);
+			_nationLevelBadgeView.SetLevel(resourcePlayer.Cybernation);
+		}
+		_turnDotsView.SetCompletedTurns(payload.completed_rounds);
 
 		_envisionController.ApplyState(
 			new EnvisionUiState
