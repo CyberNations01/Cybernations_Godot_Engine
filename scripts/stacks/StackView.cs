@@ -52,13 +52,11 @@ public partial class StackView : Node2D
 	private Color? _accessibilityOverlayColorOverride = null;
 
 	[ExportGroup("Tile Stack")]
-	[Export]
 	public TileKind DownTileType { get; set; } = TileKind.Wilds;
 
 	[Export]
 	public bool HasUpTile { get; set; }
 
-	[Export]
 	public TileKind UpTileType { get; set; } = TileKind.Human;
 
 	[Export]

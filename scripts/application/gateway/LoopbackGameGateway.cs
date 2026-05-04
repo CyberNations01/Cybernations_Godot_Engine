@@ -30,6 +30,14 @@ public sealed class LoopbackGameGateway : IGameGateway
 		new HiveBoardTilePayload(9, "wasted", "technology", false, null),
 		new HiveBoardTilePayload(10, "wasted", "technology", false, null),
 	];
+	private readonly EnvisionPlayerStatePayload[] _envisionPlayers =
+	[
+		new EnvisionPlayerStatePayload(0, 2, 2, 2, 0, 5),
+		new EnvisionPlayerStatePayload(1, 0, 0, 2, 0, 5),
+		new EnvisionPlayerStatePayload(2, 1, 1, 1, 0, 5),
+		new EnvisionPlayerStatePayload(3, 3, 1, 0, 0, 5),
+		new EnvisionPlayerStatePayload(4, 1, 2, 2, 0, 5),
+	];
 	private long _nextSequence = 1;
 
 	public event Action<string>? ServerPacketReceived;
@@ -72,6 +80,9 @@ public sealed class LoopbackGameGateway : IGameGateway
 				break;
 			case PacketTypes.CmdInfoSummaryDetailRequest:
 				EmitInfoSummaryState(envelope);
+				break;
+			case PacketTypes.CmdEnvisionAction:
+				HandleEnvisionAction(envelope);
 				break;
 			default:
 				EmitError(envelope, "unsupported_command", $"Unsupported command '{envelope.type}'.");
@@ -132,6 +143,24 @@ public sealed class LoopbackGameGateway : IGameGateway
 				new HiveBoardStatePayload(_hiveBoardTiles)
 			)
 		);
+		EmitEnvisionState(envelope, true, "Your turn. Choose an action.");
+	}
+
+	private void HandleEnvisionAction(in PacketEnvelope envelope)
+	{
+		if (!GamePacketCodec.TryDeserializePayload<EnvisionActionPayload>(envelope, out var payload))
+		{
+			EmitError(envelope, "invalid_payload", "envision_action payload is invalid.");
+			return;
+		}
+
+		if (string.IsNullOrWhiteSpace(payload.action))
+		{
+			EmitError(envelope, "missing_action", "Envision action is required.");
+			return;
+		}
+
+		EmitEnvisionState(envelope, false, BuildEnvisionStatusMessage(payload));
 	}
 
 	private void EmitChatSync(in PacketEnvelope envelope)
@@ -151,6 +180,49 @@ public sealed class LoopbackGameGateway : IGameGateway
 	private void EmitInfoSummaryState(in PacketEnvelope envelope)
 	{
 		EmitEvent(PacketTypes.EvtInfoSummaryState, envelope, _infoSummaryState);
+	}
+
+	private void EmitEnvisionState(in PacketEnvelope envelope, bool isVisible, string statusMessage)
+	{
+		const int currentPlayerId = 0;
+		const int localPlayerId = 0;
+
+		var currentPlayer = _envisionPlayers[currentPlayerId];
+		EmitEvent(
+			PacketTypes.EvtEnvisionState,
+			envelope,
+			new EnvisionStatePayload(
+				isVisible,
+				isVisible && currentPlayerId == localPlayerId,
+				currentPlayerId,
+				localPlayerId,
+				_envisionPlayers,
+				currentPlayer.people >= 1,
+				currentPlayer.environment >= 1,
+				currentPlayer.environment >= 2 || currentPlayer.people >= 2 || currentPlayer.technology >= 2,
+				currentPlayer.technology >= 2,
+				currentPlayer.people >= 2,
+				currentPlayer.environment >= 2,
+				true,
+				statusMessage
+			)
+		);
+	}
+
+	private static string BuildEnvisionStatusMessage(in EnvisionActionPayload payload)
+	{
+		return payload.action switch
+		{
+			"ShiftPower" => $"Shift Power resolved: First Player token moved to Player {(payload.target_player_id ?? 0) + 1}.",
+			"Connect" => $"Connect resolved: spent {payload.spend_type ?? "unknown"}, gained {payload.gain_type ?? "unknown"}.",
+			"SetCourse" => $"Set Course resolved: {payload.mode ?? "unknown mode"}.",
+			"Steer" when payload.mode == "AddReserveToken" => $"Steer resolved: added {payload.feedback_token_type ?? "unknown"} Feedback to the Bag.",
+			"Steer" when payload.mode == "ManipulateTokens" => $"Steer resolved: Track={payload.token_to_track}, Bag={payload.token_to_bag}, Reserve={payload.token_to_reserve}.",
+			"ComeTogether" => "Come Together resolved.",
+			"Prepare" => "Prepare resolved.",
+			"Pass" => "Pass resolved.",
+			_ => $"{payload.action} resolved.",
+		};
 	}
 
 	private void EmitError(in PacketEnvelope envelope, string code, string reason)

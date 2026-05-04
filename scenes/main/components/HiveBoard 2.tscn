@@ -1,0 +1,11 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/main/components/HiveBoardView.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://scenes/stacks/Stack.tscn" id="2_stack"]
+
+[node name="HiveBoard" type="Node2D"]
+script = ExtResource("1_script")
+tile_scene = ExtResource("2_stack")
+
+[node name="Cluster" type="Node2D" parent="."]
+position = Vector2(340, 96)

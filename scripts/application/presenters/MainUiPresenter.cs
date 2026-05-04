@@ -22,7 +22,6 @@ public sealed class MainUiPresenter : IDisposable
 	private InfoSummaryStatePayload? _cachedInfoSummaryState;
 	private bool _isBound;
 	private readonly EnvisionController _envisionController;
-	private readonly IEnvisionGateway _envisionGateway;
 
 	public MainUiPresenter(
 		IChatPanelView chatPanelView,
@@ -31,7 +30,6 @@ public sealed class MainUiPresenter : IDisposable
 		IHiveBoardView hiveBoardView,
 		IPlayerDetailPopupView playerDetailPopupView,
 		EnvisionController envisionController,
-		IEnvisionGateway envisionGateway,
 		IGameGateway gateway
 	)
 	{
@@ -42,7 +40,6 @@ public sealed class MainUiPresenter : IDisposable
 		_playerDetailPopupView = playerDetailPopupView;
 		_gateway = gateway;
 		_envisionController = envisionController;
-		_envisionGateway = envisionGateway;
 	}
 
 	public void Initialize()
@@ -63,7 +60,6 @@ public sealed class MainUiPresenter : IDisposable
 
 		_playerDetailPopupView.CloseRequested += OnPlayerDetailCloseRequested;
 		_gateway.ServerPacketReceived += OnServerPacketReceived;
-		_envisionGateway.OnStateUpdated += OnStateUpdated;
 
 		_chatPanelView.SetExpanded(false);
 		_teamGoalPanelView.SetDropdownVisible(false);
@@ -147,27 +143,32 @@ public sealed class MainUiPresenter : IDisposable
 	}
 	
 	public void OnEnvisionActionRequested(EnvisionActionRequest request)
-{
-	GD.Print($"Presenter received envision request: {request.Action}");
-
-	_envisionGateway.SendAction(request);
-}
-
-private static string BuildEnvisionStatusMessage(EnvisionActionRequest request)
-{
-	return request.Action switch
 	{
-		"ShiftPower" => $"Request received: Shift Power -> Player {request.TargetPlayerId + 1}",
-		"Connect" => $"Request received: Connect ({request.SpendType} → {request.GainType})",
-		"SetCourse" => $"Request received: Set Course -> {request.Mode}",
-		"Steer" when request.Mode == "AddReserveToken" => $"Request received: Steer -> Add {request.FeedbackTokenType} Feedback",
-		"Steer" => $"Request received: Steer -> {request.Mode}",
-		"ComeTogether" => "Request received: Come Together",
-		"Prepare" => "Request received: Prepare",
-		"Pass" => "Request received: Pass",
-		_ => $"Request received: {request.Action}"
-	};
-}
+		GD.Print($"Presenter received envision request: {request.Action}");
+
+		_gateway.SendPacket(
+			GamePacketCodec.BuildCommand(
+				PacketTypes.CmdEnvisionAction,
+				LocalRoomId,
+				LocalPlayerId,
+				new EnvisionActionPayload(
+					request.Action,
+					request.TargetPlayerId,
+					request.SpendType,
+					request.GainType,
+					request.Mode,
+					request.FeedbackTokenType,
+					request.SelectedFeedbackTrackIndex,
+					request.TrackTokenType,
+					request.DrawnTokenType1,
+					request.DrawnTokenType2,
+					request.TokenToTrack,
+					request.TokenToBag,
+					request.TokenToReserve
+				)
+			)
+		);
+	}
 
 	private void OnTeamGoalToggleRequested()
 	{
@@ -284,15 +285,13 @@ private static string BuildEnvisionStatusMessage(EnvisionActionRequest request)
 			case PacketTypes.EvtHiveBoardState:
 				ApplyHiveBoardState(envelope);
 				break;
+			case PacketTypes.EvtEnvisionState:
+				ApplyEnvisionState(envelope);
+				break;
 			case PacketTypes.EvtError:
 				ApplyError(envelope);
 				break;
 		}
-	}
-	
-	private void OnStateUpdated(EnvisionUiState state)
-	{
-		_envisionController.ApplyState(state);
 	}
 
 	private void ApplySnapshotFull(in PacketEnvelope envelope)
@@ -395,6 +394,49 @@ private static string BuildEnvisionStatusMessage(EnvisionActionRequest request)
 		}
 
 		ApplyHiveBoardPayload(payload);
+	}
+
+	private void ApplyEnvisionState(in PacketEnvelope envelope)
+	{
+		if (!GamePacketCodec.TryDeserializePayload<EnvisionStatePayload>(envelope, out var payload))
+		{
+			return;
+		}
+
+		var playerPayloads = payload.players ?? Array.Empty<EnvisionPlayerStatePayload>();
+		var players = new PlayerState[playerPayloads.Length];
+		for (var i = 0; i < players.Length; i++)
+		{
+			var player = playerPayloads[i];
+			players[i] = new PlayerState
+			{
+				Id = player.id,
+				People = player.people,
+				Environment = player.environment,
+				Technology = player.technology,
+				Cybernation = player.cybernation,
+				Cohesion = player.cohesion,
+			};
+		}
+
+		_envisionController.ApplyState(
+			new EnvisionUiState
+			{
+				IsVisible = payload.is_visible,
+				IsLocalPlayersTurn = payload.is_local_players_turn,
+				CurrentPlayerId = payload.current_player_id,
+				LocalPlayerId = payload.local_player_id,
+				Players = players,
+				CanShiftPower = payload.can_shift_power,
+				CanComeTogether = payload.can_come_together,
+				CanConnect = payload.can_connect,
+				CanSetCourse = payload.can_set_course,
+				CanPrepare = payload.can_prepare,
+				CanSteer = payload.can_steer,
+				CanPass = payload.can_pass,
+				StatusMessage = payload.status_message,
+			}
+		);
 	}
 
 	private void ApplyHiveBoardPayload(HiveBoardStatePayload payload)

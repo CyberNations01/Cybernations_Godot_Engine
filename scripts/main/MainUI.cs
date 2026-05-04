@@ -149,7 +149,6 @@ public partial class MainUI : Control
 	private HiveBoardView _hiveBoardView = null!;
 	private PlayerPanelView _playerPanelView = null!;
 	private PlayerDetailPopupView _playerDetailPopupView = null!;
-	private IEnvisionGateway _envisionGateway = null!;
 
 	private Button _colorblindToggleButton = null!;
 	private ColorRect _colorblindFilter = null!;
@@ -160,16 +159,13 @@ public partial class MainUI : Control
 	private Control _chatPanelRoot = null!;
 	private ColorRect _popupDimOverlay = null!;
 	[Export]
+	public bool UseLoopbackGateway { get; set; } = true;
+
+	[Export]
 	public string ServerUrl { get; set; } = "ws://localhost:9999";
 
 	public override void _Ready()
 	{
-		// Core UI views
-		if (string.IsNullOrWhiteSpace(ServerUrl))
-		{
-			ServerUrl = "ws://localhost:9999";
-		}
-
 		// Core UI views
 		_chatPanelView = GetNode<ChatPanelView>("UIMain/ChatPanel");
 		_teamGoalPanelView = GetNode<TeamGoalPanelView>("UIMain/TeamGoalPanel");
@@ -189,18 +185,30 @@ public partial class MainUI : Control
 		_colorblindToggleButton = GetNode<Button>("UIMain/ColorblindToggleButton");
 		_colorblindFilter = GetNode<ColorRect>("ColorblindOverlay/Filter");
 		_popupHost = GetNode<Control>("UIMain/Popups");
+		_popupDimOverlay = GetNodeOrNull<ColorRect>("UIMain/PopupDimOverlay");
 		UpdateStackHoverEffectsState();
 
 		_colorblindFilter.Visible = false;
+		if (_popupDimOverlay != null)
+		{
+			_popupDimOverlay.Visible = false;
+		}
 
 		// Let view components open their own popups inside the shared popup host
 		_chatPanelView.SetPopupHost(_popupHost);
 		_teamGoalPanelView.SetPopupHost(_popupHost);
 		_infoSummaryPanelView.SetPopupHost(_popupHost);
 
+		// Player panel interaction
+		_colorblindToggleButton.Pressed += OnColorblindTogglePressed;
+		AccessibilityManager.OnAccessibilityChanged += UpdateAccessibilityUi;
+		
+		_envisionController.ActionRequested += OnEnvisionActionRequested;
+		_envisionController.PopupOpened += DimPopupBackground;
+		_envisionController.PopupClosed += RestorePopupBackground;
+
 		// Gateway + presenter
-		_gameGateway = new WebSocketGameGateway(ServerUrl);
-		_envisionGateway = new MockEnvisionGateway();
+		_gameGateway = CreateGameGateway();
 		_presenter = new MainUiPresenter(
 			 _chatPanelView,
 			_teamGoalPanelView,
@@ -208,31 +216,10 @@ public partial class MainUI : Control
 			_hiveBoardView,
 			_playerDetailPopupView,
 			_envisionController,
-			_envisionGateway,
 			_gameGateway
 		);
-		
-		_presenter.Initialize();
-
-		// Player panel interaction
 		_playerPanelView.PlayerSelected += _presenter.OnPlayerSelected;
-		_colorblindToggleButton.Pressed += OnColorblindTogglePressed;
-		AccessibilityManager.OnAccessibilityChanged += UpdateAccessibilityUi;
-		
-		_envisionController = GetNode<EnvisionController>("EnvisionController");
-		_envisionController.ActionRequested += OnEnvisionActionRequested;
-		_envisionController.PopupOpened += DimPopupBackground;
-		_envisionController.PopupClosed += RestorePopupBackground;
-		
-		_popupDimOverlay = GetNodeOrNull<ColorRect>("UIMain/PopupDimOverlay");
-
-		if (_popupDimOverlay != null)
-
-		{
-
-			_popupDimOverlay.Visible = false;
-
-		}
+		_presenter.Initialize();
 	}
 	
 	private void DimBackground()
@@ -281,6 +268,18 @@ private void RestoreBackground()
 	{
 		_gameGateway?.Poll();
 		UpdateStackHoverEffectsState();
+	}
+
+	private IGameGateway CreateGameGateway()
+	{
+		if (!UseLoopbackGateway && !string.IsNullOrWhiteSpace(ServerUrl))
+		{
+			GD.Print($"MainUI: using WebSocket game gateway at {ServerUrl}.");
+			return new WebSocketGameGateway(ServerUrl);
+		}
+
+		GD.Print("MainUI: using loopback game gateway.");
+		return new LoopbackGameGateway();
 	}
 
 	private void OnColorblindTogglePressed()

@@ -51,4 +51,45 @@ public readonly record struct PlayerDetailRequestPayload(int slot, string progre
 
 public readonly record struct PlayerDetailPayload(int slot, string progress, string description, float preferredX, float preferredY);
 
+public readonly record struct EnvisionActionPayload(
+    string action,
+    int? target_player_id,
+    string? spend_type,
+    string? gain_type,
+    string? mode,
+    string? feedback_token_type,
+    int? selected_feedback_track_index,
+    string? track_token_type,
+    string? drawn_token_type_1,
+    string? drawn_token_type_2,
+    string? token_to_track,
+    string? token_to_bag,
+    string? token_to_reserve
+);
+
+public readonly record struct EnvisionPlayerStatePayload(
+    int id,
+    int people,
+    int environment,
+    int technology,
+    int cybernation,
+    int cohesion
+);
+
+public readonly record struct EnvisionStatePayload(
+    bool is_visible,
+    bool is_local_players_turn,
+    int current_player_id,
+    int local_player_id,
+    EnvisionPlayerStatePayload[] players,
+    bool can_shift_power,
+    bool can_come_together,
+    bool can_connect,
+    bool can_set_course,
+    bool can_prepare,
+    bool can_steer,
+    bool can_pass,
+    string status_message
+);
+
 public readonly record struct ErrorPayload(string code, string reason);
