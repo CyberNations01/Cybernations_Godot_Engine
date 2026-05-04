@@ -15,6 +15,7 @@ public sealed class MainUiPresenter : IDisposable
 	private readonly IResourceTracksView _resourceTracksView;
 	private readonly INationLevelBadgeView _nationLevelBadgeView;
 	private readonly ITurnDotsView _turnDotsView;
+	private readonly IPlayerPanelView _playerPanelView;
 	private readonly IPlayerDetailPopupView _playerDetailPopupView;
 	private readonly IGameGateway _gateway;
 	private readonly Dictionary<int, Vector2> _pendingPlayerDetailPositions = [];
@@ -24,6 +25,7 @@ public sealed class MainUiPresenter : IDisposable
 	private TeamGoalStatePayload? _cachedTeamGoalState;
 	private InfoSummaryStatePayload? _cachedInfoSummaryState;
 	private bool _isBound;
+	private bool _developerMode;
 	private readonly EnvisionController _envisionController;
 
 	public MainUiPresenter(
@@ -34,6 +36,7 @@ public sealed class MainUiPresenter : IDisposable
 		IResourceTracksView resourceTracksView,
 		INationLevelBadgeView nationLevelBadgeView,
 		ITurnDotsView turnDotsView,
+		IPlayerPanelView playerPanelView,
 		IPlayerDetailPopupView playerDetailPopupView,
 		EnvisionController envisionController,
 		IGameGateway gateway
@@ -46,6 +49,7 @@ public sealed class MainUiPresenter : IDisposable
 		_resourceTracksView = resourceTracksView;
 		_nationLevelBadgeView = nationLevelBadgeView;
 		_turnDotsView = turnDotsView;
+		_playerPanelView = playerPanelView;
 		_playerDetailPopupView = playerDetailPopupView;
 		_gateway = gateway;
 		_envisionController = envisionController;
@@ -141,6 +145,11 @@ public sealed class MainUiPresenter : IDisposable
 
 	private void OnChatSubmitted(string text)
 	{
+		if (TryHandleDeveloperModeInput(text))
+		{
+			return;
+		}
+
 		_gateway.SendPacket(
 			GamePacketCodec.BuildCommand(
 				PacketTypes.CmdChatSubmit,
@@ -297,6 +306,9 @@ public sealed class MainUiPresenter : IDisposable
 			case PacketTypes.EvtEnvisionState:
 				ApplyEnvisionState(envelope);
 				break;
+			case PacketTypes.EvtDevConsoleResult:
+				ApplyDevConsoleResult(envelope);
+				break;
 			case PacketTypes.EvtError:
 				ApplyError(envelope);
 				break;
@@ -425,12 +437,16 @@ public sealed class MainUiPresenter : IDisposable
 				Technology = player.technology,
 				Cybernation = player.cybernation,
 				Cohesion = player.cohesion,
+				PassedThisTurn = player.passed_this_turn,
+				HandSize = player.hand_size,
+				IsFirstPlayer = player.is_first_player,
+				Progress = player.progress,
 			};
 		}
 
 		if (players.Length > 0)
 		{
-			var resourceIndex = Math.Clamp(payload.current_player_id, 0, players.Length - 1);
+			var resourceIndex = FindPlayerIndex(players, payload.current_player_id);
 			var resourcePlayer = players[resourceIndex];
 			_resourceTracksView.SetResources(
 				resourcePlayer.People,
@@ -441,6 +457,7 @@ public sealed class MainUiPresenter : IDisposable
 			_nationLevelBadgeView.SetLevel(resourcePlayer.Cybernation);
 		}
 		_turnDotsView.SetCompletedTurns(payload.completed_rounds);
+		_playerPanelView.SetPlayers(BuildPlayerPanelPlayers(players));
 
 		_envisionController.ApplyState(
 			new EnvisionUiState
@@ -460,6 +477,49 @@ public sealed class MainUiPresenter : IDisposable
 				StatusMessage = payload.status_message,
 			}
 		);
+	}
+
+	private static PlayerPanelPlayerVm[] BuildPlayerPanelPlayers(IReadOnlyList<PlayerState> players)
+	{
+		var panelPlayers = new PlayerPanelPlayerVm[players.Count];
+		for (var i = 0; i < players.Count; i++)
+		{
+			var player = players[i];
+			var progress = string.IsNullOrWhiteSpace(player.Progress)
+				? BuildFallbackPlayerProgress(player)
+				: player.Progress!;
+
+			panelPlayers[i] = new PlayerPanelPlayerVm(
+				player.Id + 1,
+				progress,
+				player.PassedThisTurn
+			);
+		}
+
+		return panelPlayers;
+	}
+
+	private static string BuildFallbackPlayerProgress(PlayerState player)
+	{
+		if (player.HandSize > 0)
+		{
+			return player.HandSize == 1 ? "1 card" : $"{player.HandSize} cards";
+		}
+
+		return $"{Math.Clamp(player.Cohesion, 0, 100)}%";
+	}
+
+	private static int FindPlayerIndex(IReadOnlyList<PlayerState> players, int playerId)
+	{
+		for (var i = 0; i < players.Count; i++)
+		{
+			if (players[i].Id == playerId)
+			{
+				return i;
+			}
+		}
+
+		return Math.Clamp(playerId, 0, players.Count - 1);
 	}
 
 	private void ApplyHiveBoardPayload(HiveBoardStatePayload payload)
@@ -578,5 +638,73 @@ public sealed class MainUiPresenter : IDisposable
 		}
 
 		GD.PushWarning($"MainUiPresenter: server error code={payload.code}, reason={payload.reason}, req_id={envelope.req_id ?? "none"}");
+	}
+
+	private bool TryHandleDeveloperModeInput(string text)
+	{
+		var command = text.Trim();
+		if (command.Equals("/dev activate", StringComparison.OrdinalIgnoreCase))
+		{
+			_developerMode = true;
+			_chatPanelView.AddMessage(
+				new ChatMessageVm(
+					"DEV",
+					"Developer mode activated. Enter REST commands like GET /state. Use /dev deactivate to exit."
+				)
+			);
+			return true;
+		}
+
+		if (command.Equals("/dev deactivate", StringComparison.OrdinalIgnoreCase))
+		{
+			_developerMode = false;
+			_chatPanelView.AddMessage(new ChatMessageVm("DEV", "Developer mode deactivated."));
+			return true;
+		}
+
+		if (!_developerMode)
+		{
+			return false;
+		}
+
+		_chatPanelView.AddMessage(new ChatMessageVm("DEV>", command));
+		_gateway.SendPacket(
+			GamePacketCodec.BuildCommand(
+				PacketTypes.CmdDevConsoleCommand,
+				LocalRoomId,
+				LocalPlayerId,
+				new DevConsoleCommandPayload(command)
+			)
+		);
+		return true;
+	}
+
+	private void ApplyDevConsoleResult(in PacketEnvelope envelope)
+	{
+		if (!GamePacketCodec.TryDeserializePayload<DevConsoleResultPayload>(envelope, out var payload))
+		{
+			_chatPanelView.AddMessage(new ChatMessageVm("DEV ERROR", "Invalid developer console result payload."));
+			return;
+		}
+
+		var statusLine = payload.status_code > 0 ? $"HTTP {payload.status_code}\n" : "";
+		var body = string.IsNullOrWhiteSpace(payload.body) ? "(empty response)" : payload.body;
+		_chatPanelView.AddMessage(
+			new ChatMessageVm(
+				payload.success ? "DEV" : "DEV ERROR",
+				$"{statusLine}{TrimDevConsoleBody(body)}"
+			)
+		);
+	}
+
+	private static string TrimDevConsoleBody(string body)
+	{
+		const int maxLength = 6000;
+		if (body.Length <= maxLength)
+		{
+			return body;
+		}
+
+		return body[..maxLength] + "\n... output truncated ...";
 	}
 }

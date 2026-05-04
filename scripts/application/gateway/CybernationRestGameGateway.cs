@@ -11,7 +11,6 @@ using HttpClient = System.Net.Http.HttpClient;
 public sealed class CybernationRestGameGateway : IGameGateway
 {
 	private const string ServerPlayerId = "cybernation-server";
-	private const int DefaultConflictCells = 3;
 
 	private static readonly JsonSerializerOptions JsonOptions = new()
 	{
@@ -69,6 +68,9 @@ public sealed class CybernationRestGameGateway : IGameGateway
 			case PacketTypes.CmdEnvisionAction:
 				_ = SendEnvisionActionAsync(envelope);
 				break;
+			case PacketTypes.CmdDevConsoleCommand:
+				_ = SendDevConsoleCommandAsync(envelope);
+				break;
 			case PacketTypes.CmdPlayerDetailRequest:
 				EmitPlayerDetail(envelope);
 				break;
@@ -107,6 +109,41 @@ public sealed class CybernationRestGameGateway : IGameGateway
 		catch (Exception ex)
 		{
 			EmitError(envelope, "connection_failed", $"Could not reach Cybernation REST server at {_baseUrl}: {ex.Message}");
+		}
+	}
+
+	private async Task SendDevConsoleCommandAsync(PacketEnvelope envelope)
+	{
+		if (!GamePacketCodec.TryDeserializePayload<DevConsoleCommandPayload>(envelope, out var payload))
+		{
+			EmitDevConsoleResult(envelope, "", false, 0, "Developer console payload is invalid.");
+			return;
+		}
+
+		if (!TryBuildDevConsoleRequest(payload.command, out var request, out var error))
+		{
+			EmitDevConsoleResult(envelope, payload.command, false, 0, error);
+			return;
+		}
+
+		try
+		{
+			using (request)
+			using (var response = await _client.SendAsync(request).ConfigureAwait(false))
+			{
+				var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+				var statusCode = (int)response.StatusCode;
+				EmitDevConsoleResult(envelope, payload.command, response.IsSuccessStatusCode, statusCode, PrettyPrintJsonIfPossible(body));
+
+				if (response.IsSuccessStatusCode && IsGetStateCommand(payload.command))
+				{
+					EmitTranslatedServerState(envelope, body, "Developer console refreshed state.", 0);
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			EmitDevConsoleResult(envelope, payload.command, false, 0, $"Could not reach Cybernation REST server at {_baseUrl}: {ex.Message}");
 		}
 	}
 
@@ -216,14 +253,17 @@ public sealed class CybernationRestGameGateway : IGameGateway
 
 		if (gameState.TryGetProperty("params", out var p))
 		{
+			var conflict = GetConflict(gameState);
 			paramSummary =
 				$"Cohesion: {GetInt(p, "cohesion", 0)}\n" +
 				$"Cybernation: {GetInt(p, "cybernationLevel", 0)}\n" +
 				$"Human Relation: {GetInt(p, "humanRelation", 0)}\n" +
 				$"Environment: {GetInt(p, "environment", 0)}\n" +
-				$"Technology: {GetInt(p, "technology", 0)}";
+				$"Technology: {GetInt(p, "technology", 0)}\n" +
+				$"Conflict: {conflict}";
 		}
 
+		var passedSummary = BuildPassedPlayersSummary(gameState, controller);
 		var poolSummary = "";
 		if (gameState.TryGetProperty("pool", out var pool))
 		{
@@ -234,7 +274,7 @@ public sealed class CybernationRestGameGateway : IGameGateway
 
 		return new InfoSummaryStatePayload(
 			$"Round {round} - {phase}",
-			$"Current player: Player {currentPlayer + 1}\n\n{paramSummary}{poolSummary}\n\n{statusMessage}"
+			$"Current player: Player {currentPlayer + 1}{passedSummary}\n\n{paramSummary}{poolSummary}\n\n{statusMessage}"
 		);
 	}
 
@@ -276,29 +316,33 @@ public sealed class CybernationRestGameGateway : IGameGateway
 		var tech = paramsElement.ValueKind == JsonValueKind.Object ? GetInt(paramsElement, "technology", 0) : 0;
 		var cybernation = paramsElement.ValueKind == JsonValueKind.Object ? GetInt(paramsElement, "cybernationLevel", 0) : 0;
 		var cohesion = paramsElement.ValueKind == JsonValueKind.Object ? GetInt(paramsElement, "cohesion", 0) : 0;
+		var conflict = GetConflict(gameState);
+		var passedPlayers = BuildPassedPlayerSet(controller);
 
-		var players = BuildPlayers(gameState, hr, env, tech, cybernation, cohesion);
+		var players = BuildPlayers(gameState, passedPlayers, hr, env, tech, cybernation, cohesion);
+		var canAct = actionStatus == 0 && isVisible && !passedPlayers.Contains(currentPlayerId);
 		return new EnvisionStatePayload(
 			isVisible,
 			isVisible && currentPlayerId == localPlayerId,
 			currentPlayerId,
 			localPlayerId,
 			players,
-			DefaultConflictCells,
+			conflict,
 			Math.Max(0, round - 1),
-			actionStatus == 0 && hr >= 1,
-			actionStatus == 0 && env >= 1,
-			actionStatus == 0 && (hr >= 2 || env >= 2 || tech >= 2),
-			actionStatus == 0 && tech >= 2,
-			actionStatus == 0 && hr >= 2,
-			actionStatus == 0 && env >= 2,
-			actionStatus == 0,
+			canAct && hr >= 1,
+			canAct && env >= 1,
+			canAct && (hr >= 2 || env >= 2 || tech >= 2),
+			canAct && tech >= 2,
+			canAct && hr >= 2,
+			canAct && env >= 2,
+			canAct,
 			statusMessage
 		);
 	}
 
 	private static EnvisionPlayerStatePayload[] BuildPlayers(
 		JsonElement gameState,
+		IReadOnlySet<int> passedPlayers,
 		int hr,
 		int env,
 		int tech,
@@ -308,20 +352,36 @@ public sealed class CybernationRestGameGateway : IGameGateway
 	{
 		if (!gameState.TryGetProperty("players", out var playersElement) || playersElement.ValueKind != JsonValueKind.Array)
 		{
-			return [new EnvisionPlayerStatePayload(0, hr, env, tech, cybernation, cohesion)];
+			return [new EnvisionPlayerStatePayload(0, hr, env, tech, cybernation, cohesion, false, 0, true)];
 		}
 
 		var players = new List<EnvisionPlayerStatePayload>();
 		foreach (var player in playersElement.EnumerateArray())
 		{
+			var id = GetInt(player, "id", players.Count);
+			var handSize = GetIntAny(player, 0, "handSize", "hand_size");
+			var isFirstPlayer = GetBoolAny(player, false, "isFirstPlayer", "is_first_player");
+			var passedThisTurn = GetBoolAny(
+				player,
+				passedPlayers.Contains(id),
+				"passedThisTurn",
+				"passed_this_turn",
+				"passed"
+			);
+			var progress = GetStringAny(player, "", "progress", "progressText", "progress_text");
+
 			players.Add(
 				new EnvisionPlayerStatePayload(
-					GetInt(player, "id", players.Count),
+					id,
 					hr,
 					env,
 					tech,
 					cybernation,
-					cohesion
+					cohesion,
+					passedThisTurn,
+					handSize,
+					isFirstPlayer,
+					string.IsNullOrWhiteSpace(progress) ? null : progress
 				)
 			);
 		}
@@ -447,7 +507,7 @@ public sealed class CybernationRestGameGateway : IGameGateway
 				0,
 				0,
 				Array.Empty<EnvisionPlayerStatePayload>(),
-				DefaultConflictCells,
+				0,
 				0,
 				false,
 				false,
@@ -464,6 +524,21 @@ public sealed class CybernationRestGameGateway : IGameGateway
 	private void EmitError(in PacketEnvelope envelope, string code, string reason)
 	{
 		EnqueueEvent(PacketTypes.EvtError, envelope, new ErrorPayload(code, reason));
+	}
+
+	private void EmitDevConsoleResult(
+		in PacketEnvelope envelope,
+		string command,
+		bool success,
+		int statusCode,
+		string body
+	)
+	{
+		EnqueueEvent(
+			PacketTypes.EvtDevConsoleResult,
+			envelope,
+			new DevConsoleResultPayload(command, success, statusCode, body)
+		);
 	}
 
 	private void EnqueueEvent<TPayload>(string type, in PacketEnvelope requestEnvelope, TPayload payload)
@@ -500,6 +575,187 @@ public sealed class CybernationRestGameGateway : IGameGateway
 		return payload.ValueKind == JsonValueKind.String
 			? payload.GetString() ?? "Server action resolved."
 			: payload.ToString();
+	}
+
+	private bool TryBuildDevConsoleRequest(
+		string command,
+		out HttpRequestMessage request,
+		out string error
+	)
+	{
+		request = null!;
+		error = "";
+
+		var trimmed = command.Trim();
+		if (trimmed.Length == 0)
+		{
+			error = "Developer command cannot be empty.";
+			return false;
+		}
+
+		var separator = trimmed.IndexOf(' ');
+		if (separator <= 0)
+		{
+			error = "Expected command format like: GET /state or POST /test/action {json}.";
+			return false;
+		}
+
+		var methodName = trimmed[..separator].Trim().ToUpperInvariant();
+		var remainder = trimmed[(separator + 1)..].Trim();
+		if (remainder.Length == 0)
+		{
+			error = "Developer command is missing a path.";
+			return false;
+		}
+
+		var method = methodName switch
+		{
+			"GET" => HttpMethod.Get,
+			"POST" => HttpMethod.Post,
+			"PUT" => HttpMethod.Put,
+			"PATCH" => HttpMethod.Patch,
+			"DELETE" => HttpMethod.Delete,
+			_ => null,
+		};
+
+		if (method == null)
+		{
+			error = $"Unsupported developer HTTP method '{methodName}'.";
+			return false;
+		}
+
+		var path = remainder;
+		string? body = null;
+		var bodySeparator = remainder.IndexOf(' ');
+		if (bodySeparator >= 0)
+		{
+			path = remainder[..bodySeparator].Trim();
+			body = remainder[(bodySeparator + 1)..].Trim();
+		}
+
+		if (!path.StartsWith("/", StringComparison.Ordinal))
+		{
+			error = "Developer command path must start with '/'.";
+			return false;
+		}
+
+		request = new HttpRequestMessage(method, $"{_baseUrl}{path}");
+		if (!string.IsNullOrWhiteSpace(body))
+		{
+			request.Content = new StringContent(body, Encoding.UTF8, "application/json");
+		}
+
+		return true;
+	}
+
+	private static bool IsGetStateCommand(string command)
+	{
+		var normalized = command.Trim();
+		return normalized.Equals("GET /state", StringComparison.OrdinalIgnoreCase);
+	}
+
+	private static string PrettyPrintJsonIfPossible(string body)
+	{
+		if (string.IsNullOrWhiteSpace(body))
+		{
+			return "";
+		}
+
+		try
+		{
+			using var document = JsonDocument.Parse(body);
+			return JsonSerializer.Serialize(document.RootElement, new JsonSerializerOptions
+			{
+				WriteIndented = true,
+			});
+		}
+		catch
+		{
+			return body;
+		}
+	}
+
+	private static string BuildPassedPlayersSummary(JsonElement gameState, JsonElement controller)
+	{
+		var passedPlayers = BuildPassedPlayerSet(controller);
+		if (gameState.TryGetProperty("players", out var playersElement) && playersElement.ValueKind == JsonValueKind.Array)
+		{
+			var index = 0;
+			foreach (var player in playersElement.EnumerateArray())
+			{
+				var id = GetInt(player, "id", index);
+				if (GetBoolAny(player, false, "passedThisTurn", "passed_this_turn", "passed"))
+				{
+					passedPlayers.Add(id);
+				}
+
+				index++;
+			}
+		}
+
+		if (passedPlayers.Count == 0)
+		{
+			return "";
+		}
+
+		var sorted = new List<int>(passedPlayers);
+		sorted.Sort();
+
+		var labels = new List<string>(sorted.Count);
+		foreach (var id in sorted)
+		{
+			labels.Add($"Player {id + 1}");
+		}
+
+		return $"\nPassed this turn: {string.Join(", ", labels)}";
+	}
+
+	private static int GetConflict(JsonElement gameState)
+	{
+		if (TryGetIntAny(gameState, out var conflict, "conflict", "conflictCount", "conflict_count"))
+		{
+			return Math.Max(0, conflict);
+		}
+
+		if (gameState.TryGetProperty("params", out var parameters)
+			&& TryGetIntAny(parameters, out conflict, "conflict", "conflictCount", "conflict_count"))
+		{
+			return Math.Max(0, conflict);
+		}
+
+		if (gameState.TryGetProperty("ui", out var ui)
+			&& ui.TryGetProperty("resources", out var resources)
+			&& TryGetIntAny(resources, out conflict, "conflict", "conflictCount", "conflict_count"))
+		{
+			return Math.Max(0, conflict);
+		}
+
+		return 0;
+	}
+
+	private static HashSet<int> BuildPassedPlayerSet(JsonElement controller)
+	{
+		var passedPlayers = new HashSet<int>();
+		if (controller.ValueKind != JsonValueKind.Object
+			|| !TryGetAnyProperty(controller, out var passedPlayersElement, "passedPlayers", "passed_players"))
+		{
+			return passedPlayers;
+		}
+
+		if (passedPlayersElement.ValueKind != JsonValueKind.Array)
+		{
+			return passedPlayers;
+		}
+
+		foreach (var playerId in passedPlayersElement.EnumerateArray())
+		{
+			if (playerId.ValueKind == JsonValueKind.Number && playerId.TryGetInt32(out var id))
+			{
+				passedPlayers.Add(id);
+			}
+		}
+
+		return passedPlayers;
 	}
 
 	private static string MapRelationship(string? relationship)
@@ -541,11 +797,78 @@ public sealed class CybernationRestGameGateway : IGameGateway
 			: fallback;
 	}
 
+	private static int GetIntAny(JsonElement element, int fallback, params string[] properties)
+	{
+		return TryGetIntAny(element, out var value, properties) ? value : fallback;
+	}
+
 	private static bool GetBool(JsonElement element, string property, bool fallback)
 	{
 		return element.TryGetProperty(property, out var value) && value.ValueKind is JsonValueKind.True or JsonValueKind.False
 			? value.GetBoolean()
 			: fallback;
+	}
+
+	private static bool GetBoolAny(JsonElement element, bool fallback, params string[] properties)
+	{
+		if (!TryGetAnyProperty(element, out var value, properties))
+		{
+			return fallback;
+		}
+
+		if (value.ValueKind is JsonValueKind.True or JsonValueKind.False)
+		{
+			return value.GetBoolean();
+		}
+
+		if (value.ValueKind == JsonValueKind.String && bool.TryParse(value.GetString(), out var parsed))
+		{
+			return parsed;
+		}
+
+		return fallback;
+	}
+
+	private static string GetStringAny(JsonElement element, string fallback, params string[] properties)
+	{
+		return TryGetAnyProperty(element, out var value, properties) && value.ValueKind == JsonValueKind.String
+			? value.GetString() ?? fallback
+			: fallback;
+	}
+
+	private static bool TryGetIntAny(JsonElement element, out int value, params string[] properties)
+	{
+		value = 0;
+		if (!TryGetAnyProperty(element, out var jsonValue, properties))
+		{
+			return false;
+		}
+
+		if (jsonValue.ValueKind == JsonValueKind.Number)
+		{
+			return jsonValue.TryGetInt32(out value);
+		}
+
+		if (jsonValue.ValueKind == JsonValueKind.String && int.TryParse(jsonValue.GetString(), out value))
+		{
+			return true;
+		}
+
+		return false;
+	}
+
+	private static bool TryGetAnyProperty(JsonElement element, out JsonElement value, params string[] properties)
+	{
+		foreach (var property in properties)
+		{
+			if (element.TryGetProperty(property, out value))
+			{
+				return true;
+			}
+		}
+
+		value = default;
+		return false;
 	}
 
 }

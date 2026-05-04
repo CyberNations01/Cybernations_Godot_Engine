@@ -230,6 +230,7 @@ public partial class MainUI : Control
 			_resourceTracksView,
 			_nationLevelBadgeView,
 			_turnDotsView,
+			_playerPanelView,
 			_playerDetailPopupView,
 			_envisionController,
 			_gameGateway

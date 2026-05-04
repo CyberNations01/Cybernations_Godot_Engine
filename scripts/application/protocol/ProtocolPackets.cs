@@ -18,6 +18,15 @@ public readonly record struct ChatSubmitPayload(string sender, string content);
 
 public readonly record struct ChatSyncPayload(ChatMessageVm[] messages);
 
+public readonly record struct DevConsoleCommandPayload(string command);
+
+public readonly record struct DevConsoleResultPayload(
+    string command,
+    bool success,
+    int status_code,
+    string body
+);
+
 public readonly record struct TeamGoalStatePayload(string title, string description);
 
 public readonly record struct InfoSummaryStatePayload(string title, string body);
@@ -73,7 +82,11 @@ public readonly record struct EnvisionPlayerStatePayload(
     int environment,
     int technology,
     int cybernation,
-    int cohesion
+    int cohesion,
+    bool passed_this_turn = false,
+    int hand_size = 0,
+    bool is_first_player = false,
+    string? progress = null
 );
 
 public readonly record struct EnvisionStatePayload(

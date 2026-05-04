@@ -40,6 +40,12 @@ public readonly record struct BoardTileVm(
 	IReadOnlyList<BoardEdgeVm>? Edges
 );
 
+public readonly record struct PlayerPanelPlayerVm(
+	int Slot,
+	string Progress,
+	bool IsPassing
+);
+
 public interface IPopupHostAwareView
 {
 	void SetPopupHost(Control popupHost);
@@ -54,6 +60,7 @@ public interface IChatPanelView : IPopupHostAwareView
 	bool IsExpanded { get; }
 	void SetExpanded(bool expanded);
 	void SetMessages(IReadOnlyList<ChatMessageVm> messages);
+	void AddMessage(ChatMessageVm message);
 }
 
 public interface ITeamGoalPanelView : IPopupHostAwareView
@@ -94,6 +101,13 @@ public interface INationLevelBadgeView
 public interface ITurnDotsView
 {
 	void SetCompletedTurns(int completedTurns);
+}
+
+public interface IPlayerPanelView
+{
+	event Action<int, string, Vector2>? PlayerSelected;
+
+	void SetPlayers(IReadOnlyList<PlayerPanelPlayerVm> players);
 }
 
 public interface IPlayerDetailPopupView

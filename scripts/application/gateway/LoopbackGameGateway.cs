@@ -32,11 +32,11 @@ public sealed class LoopbackGameGateway : IGameGateway
 	];
 	private readonly EnvisionPlayerStatePayload[] _envisionPlayers =
 	[
-		new EnvisionPlayerStatePayload(0, 2, 2, 2, 0, 5),
-		new EnvisionPlayerStatePayload(1, 0, 0, 2, 0, 5),
-		new EnvisionPlayerStatePayload(2, 1, 1, 1, 0, 5),
-		new EnvisionPlayerStatePayload(3, 3, 1, 0, 0, 5),
-		new EnvisionPlayerStatePayload(4, 1, 2, 2, 0, 5),
+		new EnvisionPlayerStatePayload(0, 2, 2, 2, 0, 5, true, 4, true, "0.0%"),
+		new EnvisionPlayerStatePayload(1, 0, 0, 2, 0, 5, true, 3, false, "66.7%"),
+		new EnvisionPlayerStatePayload(2, 1, 1, 1, 0, 5, false, 5, false, "10.3%"),
+		new EnvisionPlayerStatePayload(3, 3, 1, 0, 0, 5, true, 2, false, "90.7%"),
+		new EnvisionPlayerStatePayload(4, 1, 2, 2, 0, 5, false, 4, false, "33.3%"),
 	];
 	private long _nextSequence = 1;
 
@@ -83,6 +83,9 @@ public sealed class LoopbackGameGateway : IGameGateway
 				break;
 			case PacketTypes.CmdEnvisionAction:
 				HandleEnvisionAction(envelope);
+				break;
+			case PacketTypes.CmdDevConsoleCommand:
+				HandleDevConsoleCommand(envelope);
 				break;
 			default:
 				EmitError(envelope, "unsupported_command", $"Unsupported command '{envelope.type}'.");
@@ -161,6 +164,30 @@ public sealed class LoopbackGameGateway : IGameGateway
 		}
 
 		EmitEnvisionState(envelope, false, BuildEnvisionStatusMessage(payload));
+	}
+
+	private void HandleDevConsoleCommand(in PacketEnvelope envelope)
+	{
+		if (!GamePacketCodec.TryDeserializePayload<DevConsoleCommandPayload>(envelope, out var payload))
+		{
+			EmitEvent(
+				PacketTypes.EvtDevConsoleResult,
+				envelope,
+				new DevConsoleResultPayload("", false, 0, "Developer console payload is invalid.")
+			);
+			return;
+		}
+
+		EmitEvent(
+			PacketTypes.EvtDevConsoleResult,
+			envelope,
+			new DevConsoleResultPayload(
+				payload.command,
+				false,
+				0,
+				"Developer console HTTP commands are only available with the REST server gateway."
+			)
+		);
 	}
 
 	private void EmitChatSync(in PacketEnvelope envelope)
