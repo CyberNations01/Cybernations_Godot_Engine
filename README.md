@@ -4,37 +4,8 @@ add a button at the right-down corner to test Red-Green colour-blindness accessi
 
 # [2026/5/5 UPDATE]
 ## Defects & Solutions:
-1. Player "PASS" turn labels in `RoundController.hpp` (`passedPlayers`) but not pushed to frontend.
--> Add variable `passed` token to `Player` and output whether the player has passed the turn in `RoundController::toJson()`.
-2. No `conflict` output in Json.
-->
-{
-  "gameState": {
-    "params": {
-      "cybernationLevel": 10,
-      "humanRelation": 5,
-      "technology": 12,
-      "environment": 8,
-      "cohesion": 20
-    },
-    "conflict": 3,
-    "players": [
-      {
-        "id": 0,
-        "isFirstPlayer": true,
-        "handSize": 4,
-        "passedThisTurn": false
-      }
-    ]
-  },
-  "controller": {
-    "round": 2,
-    "phase": "ENVISION",
-    "currentPlayerId": 0,
-    "passedPlayers": [1, 3],
-    "gameOver": false
-  }
-}
+1. Player PASS state is already handled by the server flow. After a player chooses Pass, frontend sends the action packet to server. Server confirms skip and sends back which player should act next and which phase/step is active. Frontend should follow `controller.currentPlayerId` / `controller.phase` instead of requiring an extra player-level pass flag.
+2. Conflict is already represented by `gameState.params.cohesion`; the frontend treats this value as the conflict/resource-cap deduction when explicit `conflict` is not present.
 
 ## Other Declaration
 1. Frontend read Json API in `CybernationsRestGameGateway.cs`. It uses `System.Text.Json.JsonDocument.Parse(serverJson)` for analyzing Json from the server.

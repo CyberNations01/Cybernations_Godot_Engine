@@ -396,7 +396,7 @@ public sealed class CybernationRestGameGateway : IGameGateway
 		var passedPlayers = BuildPassedPlayerSet(controller);
 
 		var players = BuildPlayers(gameState, passedPlayers, hr, env, tech, cybernation, cohesion);
-		var canAct = actionStatus == 0 && isVisible && !passedPlayers.Contains(currentPlayerId);
+		var canAct = actionStatus == 0 && isVisible;
 		return new EnvisionStatePayload(
 			isVisible,
 			isVisible && currentPlayerId == localPlayerId,
@@ -969,6 +969,12 @@ public sealed class CybernationRestGameGateway : IGameGateway
 
 		if (gameState.TryGetProperty("params", out var parameters)
 			&& TryGetIntAny(parameters, out conflict, "conflict", "conflictCount", "conflict_count"))
+		{
+			return Math.Max(0, conflict);
+		}
+
+		if (gameState.TryGetProperty("params", out parameters)
+			&& TryGetIntAny(parameters, out conflict, "cohesion"))
 		{
 			return Math.Max(0, conflict);
 		}
