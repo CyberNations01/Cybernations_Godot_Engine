@@ -1,0 +1,1535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cybernation - Room Test Dashboard</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  min-height: 100vh;
+  padding: 6px 12px 10px;
+}
+h1 {
+  font-size: 18px;
+  font-weight: 500;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+/* Layout */
+.main-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+  grid-template-rows: auto;
+  gap: 8px 12px;
+  align-items: start;
+  margin-bottom: 4px;
+}
+.board-row {
+  grid-column: 2;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: minmax(600px, 1fr) minmax(145px, 175px) minmax(320px, 360px);
+  align-items: stretch;
+  gap: 6px;
+  margin-top: 0;
+  margin-left: 0;
+  width: 100%;
+  min-width: 0;
+}
+.adapt-sidebar {
+  background: #16213e;
+  border: 1px solid #1a3a5c;
+  border-radius: 10px;
+  padding: 10px 12px;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  flex: 0 0 auto;
+}
+.adapt-sidebar .adapt-track-heading { margin-bottom: 8px; }
+/* No tokens yet: tight chrome — match footprint of track strip only */
+.adapt-sidebar.adapt-idle {
+  padding: 8px 10px;
+  min-width: 0;
+  max-width: none;
+  width: fit-content;
+  align-self: flex-start;
+}
+.adapt-sidebar.adapt-idle .adapt-track-heading {
+  margin-bottom: 6px;
+  font-size: 11px;
+  letter-spacing: 0.3px;
+}
+.adapt-sidebar.adapt-idle .adapt-track-visual {
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+.adapt-sidebar.adapt-idle .adapt-slot {
+  min-height: 30px;
+  padding: 2px 1px;
+  font-size: 8px;
+}
+.adapt-sidebar.adapt-idle .adapt-slot .si { font-size: 7px; }
+.adapt-sidebar.adapt-idle .adapt-ptr-cell { height: 13px; line-height: 13px; }
+.adapt-sidebar.adapt-idle .adapt-ptr { font-size: 11px; }
+/* 六种反馈标记色（与规则表一致；TURN_WASTE=Works 蓝，LOSE_COHESION=Wastes 橙） */
+.adapt-legend {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  font-size: 10px;
+  color: #8a9bb8;
+  line-height: 1.45;
+}
+.adapt-leg-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+}
+.adapt-leg-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.adapt-leg-sep {
+  width: 100%;
+  font-size: 9px;
+  color: #5c6b84;
+  letter-spacing: 0.2px;
+  margin: 6px 0 4px;
+  padding-top: 5px;
+  border-top: 1px dashed rgba(255,255,255,0.1);
+}
+.adapt-dot--develop {
+  box-shadow: inset 0 -2px 4px rgba(0,0,0,0.2), 0 0 0 1px rgba(0,0,0,0.35) !important;
+}
+.adapt-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: inset 0 -2px 4px rgba(0,0,0,0.25);
+}
+.adapt-dot.sm {
+  width: 10px;
+  height: 10px;
+}
+.adapt-dot--empty {
+  background: transparent !important;
+  border: 2px dashed rgba(255,255,255,0.22);
+  box-shadow: none;
+}
+.adapt-dot-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 18px;
+}
+.adapt-sidebar.adapt-idle .adapt-legend {
+  margin-top: 6px;
+  padding-top: 6px;
+}
+.adapt-sidebar.adapt-idle .adapt-leg-grid { gap: 4px 8px; font-size: 9px; }
+/* 11-slot track + pointer (matches server FEEDBACK_TRACK_SIZE = 11) */
+.adapt-track-visual {
+  margin-bottom: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  max-width: 100%;
+}
+.adapt-ptr-row,
+.adapt-slots-row {
+  display: grid;
+  grid-template-columns: repeat(11, minmax(26px, 1fr));
+  gap: 4px;
+  min-width: 340px;
+}
+.adapt-ptr-cell {
+  text-align: center;
+  height: 16px;
+  line-height: 16px;
+}
+.adapt-ptr {
+  color: #6ec6ff;
+  font-size: 13px;
+  font-weight: 700;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.adapt-ptr.on { opacity: 1; }
+.adapt-slot {
+  border: 1px solid #2a4560;
+  border-radius: 5px;
+  padding: 3px 2px;
+  text-align: center;
+  font-size: 9px;
+  line-height: 1.2;
+  min-height: 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 2px;
+  background: rgba(0,0,0,0.18);
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+.adapt-slot .si { color: #6b7c99; font-size: 8px; }
+.adapt-slot.idle { opacity: 0.5; }
+.adapt-slot.idle .adapt-dot--empty { border-color: rgba(255,255,255,0.12); }
+.adapt-slot.current {
+  border-color: #6ec6ff;
+  box-shadow: 0 0 0 1px rgba(110, 198, 255, 0.35);
+  background: rgba(110, 198, 255, 0.08);
+}
+.info-strip {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.top-info-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  align-items: stretch;
+}
+.info-mid-trio {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+.info-strip .panel.panel-dense,
+.info-strip .panel#ctrlPanel {
+  margin: 0;
+}
+.info-strip .panel#ctrlPanel .ctrl-grid {
+  grid-template-columns: repeat(4, minmax(56px, 1fr));
+}
+.info-strip .panel#ctrlPanel .token-info {
+  margin-top: 4px;
+}
+.board-row #ctrlPanel.vertical-ctrl {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+.board-row #ctrlPanel.vertical-ctrl .ctrl-grid {
+  grid-template-columns: 1fr;
+  gap: 5px;
+}
+.board-row #ctrlPanel.vertical-ctrl .token-info {
+  margin-top: 6px;
+}
+.info-mid-trio .panel-bag {
+  grid-column: 1 / -1;
+}
+.panel.panel-dense {
+  padding: 10px 11px;
+}
+.panel.panel-dense .panel-title {
+  margin-bottom: 6px;
+  font-size: 11px;
+  letter-spacing: 0.35px;
+}
+.stat-row.stat-row-dense {
+  gap: 5px;
+}
+.stat-row.stat-row-dense .stat-item {
+  min-width: 0;
+  flex: 1 1 52px;
+  padding: 5px 7px;
+  font-size: 11px;
+}
+.stat-row.stat-row-dense .stat-label {
+  font-size: 9px;
+}
+.stat-row.stat-row-dense .stat-value {
+  font-size: 14px;
+}
+@media (max-width: 1200px) {
+  .main-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+  }
+  .board-row {
+    grid-column: 1;
+    grid-row: 2;
+    margin-left: 0;
+    margin-top: 0;
+    grid-template-columns: 1fr;
+  }
+  .info-strip {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .top-info-row {
+    grid-template-columns: 1fr 1fr;
+  }
+  .info-mid-trio {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 680px) {
+  .top-info-row {
+    grid-template-columns: 1fr;
+  }
+  .info-mid-trio {
+    grid-template-columns: 1fr;
+  }
+  .info-mid-trio .panel-bag {
+    grid-column: auto;
+  }
+}
+
+/* Board */
+.board-wrap {
+  position: relative;
+  width: 600px;
+  height: 320px;
+  margin: 34px 0 0 0;
+}
+.hex-tile {
+  position: absolute;
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.15s;
+  z-index: 2;
+}
+.hex-tile:hover { filter: brightness(1.2); transform: scale(1.05); }
+.hex-tile polygon { stroke: rgba(255,255,255,0.3); stroke-width: 1.5; }
+.hex-tile text {
+  font-family: inherit;
+  fill: #fff;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+.hex-label { font-size: 14px; font-weight: 600; }
+.hex-sub { font-size: 11px; font-weight: 400; fill: rgba(255,255,255,0.75); }
+.hex-ring { font-size: 9px; font-weight: 400; fill: rgba(255,255,255,0.5); }
+
+/* People token */
+.ppl-marker {
+  position: absolute;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #333;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 600;
+  color: #333;
+  z-index: 12;
+  pointer-events: none;
+  transition: left 0.4s ease, top 0.4s ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+
+/* Last walk_path route overlay (board-local px coords) */
+#walkPathHighlightSvg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 600px;
+  height: 320px;
+  pointer-events: none;
+  z-index: 6;
+}
+
+/* Panels */
+.panel {
+  background: #16213e;
+  border: 1px solid #1a3a5c;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.panel-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #7b8ca8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+.stat-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.stat-item {
+  background: #0f1a30;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #e0e0e0;
+  min-width: 70px;
+}
+.stat-label {
+  font-size: 10px;
+  color: #7b8ca8;
+  display: block;
+  margin-bottom: 2px;
+}
+.stat-value {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+/* Controller info */
+.ctrl-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.ctrl-item {
+  background: #0f1a30;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+.ctrl-item .val {
+  font-weight: 600;
+  font-size: 15px;
+  color: #6ec6ff;
+}
+.token-info {
+  margin-top: 6px;
+  background: #0f1a30;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+.token-info .val {
+  font-weight: 600;
+  font-size: 15px;
+  color: #6ec6ff;
+}
+
+/* Players */
+.player-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 13px;
+}
+.player-badge {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: #1a3a5c;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 600; font-size: 12px;
+  color: #6ec6ff;
+}
+.player-badge.first {
+  background: #c9a227;
+  color: #1a1a2e;
+}
+.player-badge.active {
+  box-shadow: 0 0 0 2px #6ec6ff;
+}
+
+/* Controls */
+.ctrl-panel {
+  background: #16213e;
+  border: 1px solid #1a3a5c;
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+.ctrl-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.ctrl-row:last-child { margin-bottom: 0; }
+.ctrl-row label {
+  font-size: 11px;
+  color: #7b8ca8;
+  display: block;
+  margin-bottom: 3px;
+}
+.ctrl-row select, .ctrl-row input[type="text"], .ctrl-row input[type="number"] {
+  background: #0f1a30;
+  border: 1px solid #1a3a5c;
+  border-radius: 6px;
+  color: #e0e0e0;
+  font-size: 13px;
+  padding: 6px 10px;
+  outline: none;
+}
+.ctrl-row select:focus, .ctrl-row input:focus {
+  border-color: #6ec6ff;
+}
+.btn {
+  background: #1a3a5c;
+  border: 1px solid #2a5a8c;
+  border-radius: 6px;
+  color: #e0e0e0;
+  font-size: 13px;
+  padding: 6px 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn:hover { background: #2a5a8c; }
+.btn-primary {
+  background: #1565c0;
+  border-color: #1976d2;
+}
+.btn-primary:hover { background: #1976d2; }
+.btn-refresh {
+  background: #0f5132;
+  border-color: #198754;
+}
+.btn-refresh:hover { background: #198754; }
+.btn-mode-direct {
+  background: #495057;
+  border-color: #6c757d;
+}
+.btn-mode-direct:hover { background: #5c636a; }
+.btn-mode-controlled {
+  background: #0d6efd;
+  border-color: #3d8bfd;
+}
+.btn-mode-controlled:hover { background: #0b5ed7; }
+
+/* Quick actions */
+.quick-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.quick-btn {
+  background: #0f1a30;
+  border: 1px solid #1a3a5c;
+  border-radius: 6px;
+  color: #7b8ca8;
+  font-size: 11px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.quick-btn:hover {
+  background: #1a3a5c;
+  color: #e0e0e0;
+}
+
+/* Log */
+.log-box {
+  background: #0a0f1a;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 11px;
+  color: #7b8ca8;
+  max-height: 150px;
+  overflow-y: auto;
+  margin-top: 10px;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+.log-box .log-ok { color: #4caf50; }
+.log-box .log-err { color: #ef5350; }
+.log-box .log-req { color: #6ec6ff; }
+
+/* Disruption indicator */
+.disruption-bar {
+  background: #3e1a1a;
+  border: 1px solid #6b2c2c;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #ef9a9a;
+  margin-bottom: 4px;
+  display: none;
+}
+.disruption-bar.active { display: block; }
+.adapt-players {
+  margin-top: 8px;
+}
+</style>
+
+<h1>Cybernation Room Test Dashboard</h1>
+
+<div id="disruptionBar" class="disruption-bar">
+  <strong>Active disruption:</strong> <span id="disruptName">—</span>
+  (<span id="disruptCat">—</span>) | Cancellable: <span id="disruptCancel">—</span>
+</div>
+
+<div class="main-grid">
+  <div class="board-row">
+    <div class="board-wrap" id="boardWrap"></div>
+    <div class="panel vertical-ctrl" id="ctrlPanel">
+      <p class="panel-title">Round controller</p>
+      <div class="ctrl-grid" id="ctrlInfo"></div>
+      <div class="token-info" id="tokenInfo">People token: --</div>
+    </div>
+    <aside class="adapt-sidebar adapt-idle" id="adaptSidebar">
+      <p class="panel-title adapt-track-heading">Adapt track (11 slots)</p>
+      <div class="adapt-track-visual" id="adaptTrackVisual" aria-label="Adapt feedback track"></div>
+      <div class="adapt-legend" aria-label="Six feedback token colors">
+        <div class="adapt-leg-grid">
+          <span class="adapt-leg-item"><span class="adapt-dot sm" style="background:#2d8a4e"></span> Wilds</span>
+          <span class="adapt-leg-item"><span class="adapt-dot sm" style="background:#b87333"></span> Wastes</span>
+          <span class="adapt-leg-item"><span class="adapt-dot sm" style="background:#2563eb"></span> Works (DevA)</span>
+          <span class="adapt-leg-item"><span class="adapt-dot sm" style="background:#c060a0"></span> Agora (DevB)</span>
+        </div>
+        <div class="adapt-leg-sep">Not from stacks — role / standalone tokens</div>
+        <div class="adapt-leg-grid">
+          <span class="adapt-leg-item"><span class="adapt-dot sm adapt-dot--develop" style="background:#c9a227"></span> Develop</span>
+          <span class="adapt-leg-item"><span class="adapt-dot sm" style="background:#b91c1c"></span> Transform</span>
+        </div>
+      </div>
+      <div class="panel adapt-players">
+        <p class="panel-title">Players</p>
+        <div id="playerList"></div>
+      </div>
+    </aside>
+  </div>
+  <div class="info-strip">
+    <div class="top-info-row">
+      <div class="panel panel-dense">
+        <p class="panel-title">Parameters</p>
+        <div class="stat-row stat-row-dense" id="paramStats"></div>
+      </div>
+      <div class="panel panel-dense">
+        <p class="panel-title">Feedback pool</p>
+        <div class="stat-row stat-row-dense" id="poolStats"></div>
+      </div>
+    </div>
+    <div class="info-mid-trio">
+      <div class="panel panel-dense panel-bag">
+        <p class="panel-title">Bag</p>
+        <div class="stat-row stat-row-dense" id="bagStats"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="ctrl-panel">
+  <p class="panel-title">Send action</p>
+  <div class="quick-actions" id="quickActionsBar"></div>
+  <div class="ctrl-row">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <label style="margin:0;">Current request mode</label>
+      <button class="btn btn-mode-controlled" id="modeToggleBtn" type="button">Room session mode (/action)</button>
+      <span style="font-size:12px;color:#8aa0c2;">This page tests Room join/session binding. Actions use <code>sessionId</code>; playerId is assigned by server.</span>
+    </div>
+  </div>
+  <div class="ctrl-row">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;width:100%;">
+      <button class="btn btn-primary" id="joinRoomBtn" type="button">Join room</button>
+      <button class="btn btn-refresh" id="startRoomBtn" type="button">Start room</button>
+      <button class="btn" id="pollMessagesBtn" type="button">Poll messages</button>
+      <span id="roomSessionInfo" style="font-size:12px;color:#8aa0c2;">Not joined</span>
+    </div>
+  </div>
+  <div class="ctrl-row">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;width:100%;">
+      <label style="margin:0;"><input id="autoSuggestToggle" type="checkbox" checked /> Auto-fill suggested player/action (controlled)</label>
+      <button class="btn" id="applySuggestBtn" type="button">Apply suggestion now</button>
+      <span id="suggestionHint" style="font-size:12px;color:#8aa0c2;">Suggestion: --</span>
+      <span id="validationHint" style="font-size:12px;color:#ef9a9a;"></span>
+    </div>
+  </div>
+  <div class="ctrl-row">
+    <div>
+      <label id="phaseLabel">Phase</label>
+      <select id="phaseSelect">
+        <option value="ENVISION">ENVISION</option>
+        <option value="TRAVERSE" selected>TRAVERSE</option>
+        <option value="ADOPT">ADOPT</option>
+      </select>
+    </div>
+    <div>
+      <label>Player ID</label>
+      <input id="playerIdInput" type="number" min="0" max="4" value="0" style="width:60px;" />
+    </div>
+    <div style="flex:1;">
+      <label>Action type</label>
+      <input id="actionTypeInput" type="text" value="walk_path" style="width:100%;" />
+    </div>
+    <div style="flex:2;">
+      <label>Params (JSON)</label>
+      <input id="paramsInput" type="text" value="{}" style="width:100%;" />
+    </div>
+  </div>
+  <div class="ctrl-row">
+    <div style="flex:1;">
+      <label><input id="useRawRequestToggle" type="checkbox" /> Use full request JSON (override split fields)</label>
+      <input id="rawRequestInput" type="text" value='{"phase":"TRAVERSE","playerId":0,"type":"walk_path","params":{}}' style="width:100%;" />
+    </div>
+  </div>
+  <div class="ctrl-row">
+    <button class="btn btn-primary" id="sendBtn">Send action</button>
+    <button class="btn btn-refresh" id="refreshBtn">Refresh state</button>
+    <button type="button" class="btn" id="clearRouteBtn" title="Clear highlighted walk_path only">Clear route</button>
+  </div>
+  <div class="log-box" id="logBox">Ready. Click "Refresh state" to load game state from server.\n</div>
+</div>
+
+<script>
+const API = 'http://localhost:8081';
+const HEX = 48;
+const PAD = 4;
+const BOARD_Y_OFFSET = 78;
+const W = HEX * 2 + PAD * 2;                      // flat-top: width = 2*size + padding
+const H = Math.round(HEX * 1.732) + PAD * 2;      // flat-top: height = sqrt(3)*size + padding
+
+const tilePositions = [
+  { id:  0, x: 300.0, y: 240.0, ring: 'inner' },
+  { id:  1, x: 300.0, y: 156.9, ring: 'middle' },
+  { id:  2, x: 372.0, y: 198.4, ring: 'middle' },
+  { id:  3, x: 372.0, y: 281.6, ring: 'middle' },
+  { id:  4, x: 300.0, y: 323.1, ring: 'middle' },
+  { id:  5, x: 228.0, y: 281.6, ring: 'middle' },
+  { id:  6, x: 228.0, y: 198.4, ring: 'middle' },
+  { id:  7, x: 156.0, y: 156.9, ring: 'outer' },
+  { id:  8, x: 444.0, y: 156.9, ring: 'outer' },
+  { id:  9, x: 156.0, y: 323.1, ring: 'outer' },
+  { id: 10, x: 444.0, y: 323.1, ring: 'outer' },
+];
+
+/* Wild 绿 / Waste 橙 / DevA 蓝 / DevB 粉 — 仅按 stack type，不按 ring 覆盖 */
+const typeColors = {
+  'Wild': '#2d8a4e', 'Waste': '#b87333', 'DevA': '#2563eb', 'DevB': '#c060a0',
+  0: '#2d8a4e', 1: '#b87333', 2: '#2563eb', 3: '#c060a0'
+};
+const typeNames = { 0: 'Wild', 1: 'Waste', 2: 'DevA', 3: 'DevB' };
+
+let currentCtrl = null;
+let lastPayload = [];
+/** @type {{ x: number, y: number }[] | null} Board-local pixels for last successful walk_path */
+let walkPathHighlight = null;
+/** Server GameRoom session; changes after server restart (see GET /state sessionId). */
+let lastServerSessionId = null;
+let roundControlMode = true;
+let roomSessionId = localStorage.getItem('cybernationRoomSessionId') || '';
+let roomConnId = null;
+let roomPlayerId = null;
+
+const QUICK_ACTIONS_BY_PHASE = {
+  ENVISION: ['shift_power', 'come_together', 'prepare', 'set_course', 'connect', 'steer', 'pass', 'advance'],
+  TRAVERSE: ['draw_disruption', 'resolve_disruption', 'walk_path'],
+  ADOPT: ['resolve_feedback', 'resolve_disruption']
+};
+
+function getCurrentSelectedPhase() {
+  return document.getElementById('phaseSelect').value;
+}
+
+function updateRoomSessionInfo() {
+  const el = document.getElementById('roomSessionInfo');
+  if (!el) return;
+  if (!roomSessionId) {
+    el.textContent = 'Not joined';
+    return;
+  }
+  el.textContent = `session=${roomSessionId} conn=${roomConnId ?? '?'} player=P${roomPlayerId ?? '?'}`;
+}
+
+function allowedQuickActions() {
+  if (roundControlMode && currentCtrl && Array.isArray(currentCtrl.allowed_actions) && currentCtrl.allowed_actions.length > 0) {
+    return currentCtrl.allowed_actions.slice();
+  }
+  const phase = getCurrentSelectedPhase();
+  let actions = QUICK_ACTIONS_BY_PHASE[phase] || [];
+  if (!roundControlMode) {
+    actions = actions.filter(a => a !== 'advance');
+  }
+  return actions;
+}
+
+function getSuggestionsFromCtrl() {
+  if (!currentCtrl) return null;
+  const suggestedPlayer = Number.isInteger(currentCtrl.currentPlayerId) ? currentCtrl.currentPlayerId : currentCtrl.next_player_id;
+  const allowed = Array.isArray(currentCtrl.allowed_actions) ? currentCtrl.allowed_actions : [];
+  const suggestedAction = currentCtrl.recommended_action || (allowed.length > 0 ? allowed[0] : '');
+  return { suggestedPlayer, suggestedAction, allowed };
+}
+
+function renderSuggestionHint() {
+  const hint = document.getElementById('suggestionHint');
+  if (!hint) return;
+  if (!roundControlMode) {
+    hint.textContent = 'Suggestion: only active in controlled mode';
+    return;
+  }
+  const sug = getSuggestionsFromCtrl();
+  if (!sug) {
+    hint.textContent = 'Suggestion: waiting for /state';
+    return;
+  }
+  const allowedStr = sug.allowed && sug.allowed.length ? sug.allowed.join(', ') : '-';
+  hint.textContent = `Suggestion: playerId=${sug.suggestedPlayer}, action=${sug.suggestedAction || '-'} (allowed: ${allowedStr})`;
+}
+
+function applySuggestionsToInputs(force = false) {
+  if (!roundControlMode) return;
+  if (!force && !document.getElementById('autoSuggestToggle').checked) return;
+  if (document.getElementById('useRawRequestToggle').checked) return;
+
+  const sug = getSuggestionsFromCtrl();
+  if (!sug) return;
+  if (Number.isInteger(sug.suggestedPlayer)) {
+    document.getElementById('playerIdInput').value = String(sug.suggestedPlayer);
+  }
+  if (sug.suggestedAction) {
+    document.getElementById('actionTypeInput').value = sug.suggestedAction;
+  }
+}
+
+function validateControlledInputs(body = null) {
+  const hint = document.getElementById('validationHint');
+  if (!hint) return;
+  hint.textContent = '';
+  if (!roundControlMode || !currentCtrl) return;
+
+  const allowed = Array.isArray(currentCtrl.allowed_actions) ? currentCtrl.allowed_actions : [];
+  const expectedPlayer = Number.isInteger(currentCtrl.currentPlayerId) ? currentCtrl.currentPlayerId : currentCtrl.next_player_id;
+  const checkBody = body || {
+    playerId: parseInt(document.getElementById('playerIdInput').value) || 0,
+    type: document.getElementById('actionTypeInput').value.trim()
+  };
+
+  const warnings = [];
+  if (!roomSessionId) {
+    warnings.push('not joined');
+  }
+  if (Number.isInteger(expectedPlayer) && roomPlayerId !== null && roomPlayerId !== expectedPlayer) {
+    warnings.push(`this session is P${roomPlayerId}, current player is P${expectedPlayer}`);
+  }
+  if (Object.prototype.hasOwnProperty.call(checkBody, 'playerId') &&
+      Number.isInteger(expectedPlayer) &&
+      checkBody.playerId !== expectedPlayer) {
+    warnings.push(`playerId=${checkBody.playerId} (expected ${expectedPlayer})`);
+  }
+  if (allowed.length > 0 && !allowed.includes(checkBody.type)) {
+    warnings.push(`action=${checkBody.type} (allowed: ${allowed.join(', ')})`);
+  }
+
+  if (warnings.length > 0) {
+    hint.textContent = `Warning: ${warnings.join(' ; ')}`;
+  }
+}
+
+function renderQuickActions() {
+  const bar = document.getElementById('quickActionsBar');
+  const actions = allowedQuickActions();
+  bar.innerHTML = actions.map(a =>
+    `<button class="quick-btn" type="button" data-action="${a}">${a}</button>`
+  ).join('');
+
+  for (const btn of bar.querySelectorAll('button[data-action]')) {
+    btn.onclick = () => quickAction(btn.dataset.action);
+  }
+
+  const currentType = document.getElementById('actionTypeInput').value.trim();
+  if (!actions.includes(currentType) && actions.length > 0) {
+    document.getElementById('actionTypeInput').value = actions[0];
+  }
+}
+
+function setModeUI() {
+  const modeBtn = document.getElementById('modeToggleBtn');
+  const phaseSelect = document.getElementById('phaseSelect');
+  const phaseLabel = document.getElementById('phaseLabel');
+  const endpoint = '/action';
+
+  roundControlMode = true;
+  modeBtn.textContent = 'Room session mode (/action)';
+  modeBtn.classList.remove('btn-mode-direct', 'btn-mode-controlled', 'btn-refresh');
+  modeBtn.classList.add('btn-mode-controlled');
+  phaseSelect.disabled = true;
+  phaseLabel.textContent = 'Phase (server controlled)';
+
+  if (roundControlMode && currentCtrl && currentCtrl.phase) {
+    phaseSelect.value = currentCtrl.phase;
+  }
+  renderQuickActions();
+  renderSuggestionHint();
+  applySuggestionsToInputs();
+  validateControlledInputs();
+  updateRoomSessionInfo();
+  log('Mode switched to ' + endpoint, 'ok');
+}
+
+function toggleRoundControlMode() {
+  setModeUI();
+}
+
+const BOARD_W = 600;
+const BOARD_H = 320;
+
+function clearWalkRouteOverlay() {
+  walkPathHighlight = null;
+  lastPayload = [];
+}
+
+function hexPoints(cx, cy, s) {
+  const pts = [];
+  for (let i = 0; i < 6; i++) {
+    const a = Math.PI / 180 * (60 * i); // flat-top: vertices at 0°,60°,120°,180°,240°,300°
+    pts.push(`${Math.round(cx + s * Math.cos(a))},${Math.round(cy - s * Math.sin(a))}`);
+  }
+  return pts.join(' ');
+}
+
+function sidePos(cx, cy, s, side) {
+  // Flat-top hex, side 0 = top, clockwise
+  // side 0 = top         → 90°
+  // side 1 = top-right   → 30°
+  // side 2 = bottom-right→ 330°
+  // side 3 = bottom      → 270°
+  // side 4 = bottom-left → 210°
+  // side 5 = top-left    → 150°
+  const angles = [90, 30, 330, 270, 210, 150];
+  const r = s * 0.866;
+  const a = angles[side] * Math.PI / 180;
+  return { x: cx + r * Math.cos(a), y: cy - r * Math.sin(a) };
+}
+
+function normalizeSide(side) {
+  return ((side % 6) + 6) % 6;
+}
+
+/** Edge midpoint in board-wrap coordinates (same as people marker). */
+function edgeGlobal(tileId, side) {
+  const pos = tilePositions.find(p => p.id === tileId);
+  if (!pos || side < 0 || side > 5) return null;
+  const cx = W / 2;
+  const cy = H / 2;
+  const edge = sidePos(cx, cy, HEX * 1.04, side);
+  return {
+    x: pos.x - W / 2 + edge.x,
+    y: pos.y - H / 2 - BOARD_Y_OFFSET + edge.y
+  };
+}
+
+/**
+ * Build polyline from walk_path payload: use base layer only (one enter/exit pair per hop).
+ */
+function buildWalkHighlightFromPayload(payload) {
+  if (!Array.isArray(payload) || payload.length === 0) return null;
+  const pts = [];
+  let prevKey = null;
+  for (const item of payload) {
+    if (item.layer && item.layer !== 'base') continue;
+    const t = item.tile;
+    const s = item.side;
+    if (t === undefined || s === undefined) continue;
+    const key = `${t},${s}`;
+    if (key === prevKey) continue;
+    prevKey = key;
+    const g = edgeGlobal(t, s);
+    if (!g) continue;
+    // Neighbor tiles may place the shared edge midpoint a few px apart due to board layout rounding.
+    // Snap near-adjacent points to one midpoint so joints render cleanly.
+    if (pts.length > 0) {
+      const prev = pts[pts.length - 1];
+      const dx = g.x - prev.x;
+      const dy = g.y - prev.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist <= 10) {
+        prev.x = (prev.x + g.x) / 2;
+        prev.y = (prev.y + g.y) / 2;
+        continue;
+      }
+    }
+    pts.push(g);
+  }
+  return pts.length >= 2 ? pts : null;
+}
+
+function renderWalkHighlight(wrap) {
+  const old = document.getElementById('walkPathHighlightSvg');
+  if (old) old.remove();
+  if (!walkPathHighlight || walkPathHighlight.length < 2) return;
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.id = 'walkPathHighlightSvg';
+  svg.setAttribute('viewBox', `0 0 ${BOARD_W} ${BOARD_H}`);
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+  const pointsStr = walkPathHighlight.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+
+  const glow = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+  glow.setAttribute('points', pointsStr);
+  glow.setAttribute('fill', 'none');
+  glow.setAttribute('stroke', 'rgba(0,0,0,0.35)');
+  glow.setAttribute('stroke-width', '8');
+  glow.setAttribute('stroke-linecap', 'round');
+  glow.setAttribute('stroke-linejoin', 'round');
+
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+  line.setAttribute('points', pointsStr);
+  line.setAttribute('fill', 'none');
+  line.setAttribute('stroke', '#ffd54f');
+  line.setAttribute('stroke-width', '4');
+  line.setAttribute('stroke-linecap', 'round');
+  line.setAttribute('stroke-linejoin', 'round');
+
+  svg.appendChild(glow);
+  svg.appendChild(line);
+
+  walkPathHighlight.forEach((p, i) => {
+    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    c.setAttribute('cx', p.x.toFixed(1));
+    c.setAttribute('cy', p.y.toFixed(1));
+    c.setAttribute('r', i === 0 || i === walkPathHighlight.length - 1 ? '5' : '4');
+    c.setAttribute('fill', i === 0 ? '#fff59d' : (i === walkPathHighlight.length - 1 ? '#ffe082' : '#fffde7'));
+    c.setAttribute('stroke', '#8d6e63');
+    c.setAttribute('stroke-width', '1');
+    svg.appendChild(c);
+  });
+
+  wrap.appendChild(svg);
+}
+
+function renderBoard(boardData, peopleToken, payload = []) {
+  const wrap = document.getElementById('boardWrap');
+  wrap.innerHTML = '';
+  boardData.forEach((tile) => {
+    const pos = tilePositions.find(p => p.id === tile.position);
+    if (!pos) return;
+    const typeName = typeof tile.type === 'string' ? tile.type : (typeNames[tile.type] || '?');
+    const fill = typeColors[tile.type] ?? typeColors[typeName] ?? '#555';
+    const cx = W / 2;
+    const cy = H / 2;
+
+    // Build path lines
+    let pathArrows = '';
+    if (tile.paths) {
+      const drawn = new Set();
+      Object.entries(tile.paths).forEach(([fromStr, to]) => {
+        const from = parseInt(fromStr);
+        const key = Math.min(from, to) + ',' + Math.max(from, to);
+        if (drawn.has(key)) return;
+        drawn.add(key);
+        const p1 = sidePos(cx, cy, HEX, from);
+        const p2 = sidePos(cx, cy, HEX, to);
+        pathArrows +=
+          `<line x1="${p1.x.toFixed(1)}" y1="${p1.y.toFixed(1)}" ` +
+          `x2="${p2.x.toFixed(1)}" y2="${p2.y.toFixed(1)}" ` +
+          `stroke="rgba(255,255,255,0.3)" stroke-width="1.5" stroke-linecap="round"/>`;
+        pathArrows +=
+          `<circle cx="${p1.x.toFixed(1)}" cy="${p1.y.toFixed(1)}" r="3" fill="rgba(255,255,255,0.5)"/>` +
+          `<circle cx="${p2.x.toFixed(1)}" cy="${p2.y.toFixed(1)}" r="3" fill="rgba(255,255,255,0.5)"/>`;
+      });
+    }
+
+    // Show stack-local side numbers at their rotated board positions.
+    let sideLabels = '';
+    const rotation = normalizeSide(parseInt(tile.rotation ?? 0));
+    for (let s = 0; s < 6; s++) {
+      const lp = sidePos(cx, cy, HEX * 0.82, s);
+      const stackSideLabel = normalizeSide(s - rotation);
+      sideLabels += `<text x="${lp.x.toFixed(1)}" y="${lp.y.toFixed(1)}" ` +
+        `font-size="8" fill="rgba(255,255,255,0.6)" text-anchor="middle" dominant-baseline="central">${stackSideLabel}</text>`;
+    }
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', W);
+    svg.setAttribute('height', H);
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.classList.add('hex-tile');
+    svg.style.left = (pos.x - W/2) + 'px';
+    svg.style.top = (pos.y - H/2 - BOARD_Y_OFFSET) + 'px';
+    svg.innerHTML =
+      `<polygon points="${hexPoints(W/2, H/2, HEX)}" fill="${fill}"/>` +
+      pathArrows +
+      sideLabels +
+      `<text x="${cx}" y="${cy - 10}" class="hex-label">T${tile.position}</text>` +
+      `<text x="${cx}" y="${cy + 6}" class="hex-sub">${typeName}</text>` +
+      `<text x="${cx}" y="${cy + 20}" class="hex-ring">${pos.ring}</text>`;
+    svg.onclick = () => {
+      const pathStr = tile.paths ? Object.entries(tile.paths).map(([f,t]) => `${f}→${t}`).join(', ') : 'none';
+      log(`Tile T${tile.position}: ${typeName} (${pos.ring}) | rotation: ${rotation} | paths: ${pathStr}`, 'info');
+    };
+    wrap.appendChild(svg);
+  });
+
+  if (peopleToken) {
+    const tileId = peopleToken[0] !== undefined ? peopleToken[0] : -1;
+    const boardSide = peopleToken[1] !== undefined ? peopleToken[1] : -1;
+    const pos = tilePositions.find(p => p.id === tileId);
+    if (pos) {
+      const tokenTile = boardData.find(t => t.position === tileId) || {};
+      const tokenRotation = normalizeSide(parseInt(tokenTile.rotation ?? 0));
+      const stackSide = boardSide >= 0 && boardSide < 6 ? normalizeSide(boardSide - tokenRotation) : -1;
+      const marker = document.createElement('div');
+      marker.className = 'ppl-marker';
+      marker.textContent = 'P';
+      marker.title = `People token: tile ${tileId}, board side ${boardSide}, stack side ${stackSide}`;
+      // Align with SVG layout: hex center in each svg is (W/2, H/2), tile origin is top-left.
+      // People token lives on the board edge, so rotation changes its stack-side label but not its coordinate.
+      const cx = W / 2;
+      const cy = H / 2;
+      const edge = boardSide >= 0 && boardSide < 6 ? sidePos(cx, cy, HEX * 1.06, boardSide) : { x: cx, y: cy };
+      const mw = 24;
+      marker.style.left = (pos.x - W / 2 + edge.x - mw / 2) + 'px';
+      marker.style.top = (pos.y - H / 2 - BOARD_Y_OFFSET + edge.y - mw / 2) + 'px';
+      wrap.appendChild(marker);
+    }
+  }
+
+  renderWalkHighlight(wrap);
+}
+
+function renderParams(params) {
+  const el = document.getElementById('paramStats');
+  const keys = [
+    ['cohesion', 'Co'],
+    ['cybernationLevel', 'Cy'],
+    ['humanRelation', 'HR'],
+    ['environment', 'Env'],
+    ['technology', 'Tech']
+  ];
+  el.innerHTML = keys.map(([k, short]) =>
+    `<div class="stat-item"><span class="stat-label">${short}</span><span class="stat-value">${params[k] ?? '?'}</span></div>`
+  ).join('');
+}
+
+/** Keys match server tokenBagBreakdown / tokenEffectToStr */
+const BAG_BREAKDOWN_KEYS = [
+  ['TURN_WILD', 'Wild'],
+  ['LOSE_COHESION', '−Co'],
+  ['TURN_WASTE', 'Works'],
+  ['SOLVE_DISRUPTION', 'Agora'],
+  ['DEVELOP_STACK', 'Develop'],
+  ['TRANSFORM_STACK', 'Transform'],
+  ['UNKNOWN', '?']
+];
+
+function renderBag(breakdown, totalCount) {
+  const el = document.getElementById('bagStats');
+  if (!el) return;
+  const b = breakdown && typeof breakdown === 'object' ? breakdown : {};
+  const rows = BAG_BREAKDOWN_KEYS.map(([key, short]) => {
+    const v = b[key];
+    const n = typeof v === 'number' ? v : 0;
+    return `<div class="stat-item"><span class="stat-label">${short}</span><span class="stat-value">${n}</span></div>`;
+  }).join('');
+  const sum = typeof totalCount === 'number' ? totalCount : '?';
+  el.innerHTML =
+    rows +
+    `<div class="stat-item"><span class="stat-label">Σ</span><span class="stat-value">${sum}</span></div>`;
+}
+
+function renderPool(pool) {
+  const el = document.getElementById('poolStats');
+  const keys = ['turnWild','turnWaste','loseCohesion','solveDisruption','develop','transform','totalRemaining'];
+  el.innerHTML = keys.map(k =>
+    `<div class="stat-item"><span class="stat-label">${k}</span><span class="stat-value">${pool[k] ?? '?'}</span></div>`
+  ).join('');
+}
+
+function renderPlayers(players, currentPlayerId) {
+  const el = document.getElementById('playerList');
+  el.innerHTML = players.map(p => {
+    const isActive = currentPlayerId !== undefined && p.id === currentPlayerId;
+    return `<div class="player-row">
+      <div class="player-badge${p.isFirstPlayer ? ' first' : ''}${isActive ? ' active' : ''}">P${p.id}</div>
+      <span>Hand: ${p.handSize}</span>
+      ${p.isFirstPlayer ? '<span style="color:#c9a227;font-size:11px;">★ first</span>' : ''}
+      ${isActive ? '<span style="color:#6ec6ff;font-size:11px;">● active</span>' : ''}
+    </div>`;
+  }).join('');
+}
+
+function renderCtrl(ctrl) {
+  currentCtrl = ctrl;
+  const el = document.getElementById('ctrlInfo');
+  if (!ctrl) { el.textContent = 'No controller data'; return; }
+  if (roundControlMode && ctrl.phase) {
+    const phaseSelect = document.getElementById('phaseSelect');
+    phaseSelect.value = ctrl.phase;
+    renderQuickActions();
+  }
+  renderSuggestionHint();
+  applySuggestionsToInputs();
+  validateControlledInputs();
+  el.innerHTML = `
+    <div class="ctrl-item"><span class="stat-label">Round</span><span class="val">${ctrl.round}</span></div>
+    <div class="ctrl-item"><span class="stat-label">Current player</span><span class="val">P${ctrl.currentPlayerId}</span></div>
+    <div class="ctrl-item"><span class="stat-label">Phase</span><span class="val">${ctrl.phase}</span></div>
+    <div class="ctrl-item"><span class="stat-label">Game over</span><span class="val">${ctrl.gameOver ? 'YES' : 'No'}</span></div>
+  `;
+}
+
+function renderTokenInfo(peopleToken, boardData = []) {
+  const el = document.getElementById('tokenInfo');
+  if (!el) return;
+  if (!Array.isArray(peopleToken) || peopleToken.length < 2) {
+    el.innerHTML = `<span class="stat-label">People token</span><span class="val">--</span>`;
+    return;
+  }
+  const tileId = peopleToken[0];
+  const boardSide = peopleToken[1];
+  const tile = boardData.find(t => t.position === tileId) || {};
+  const rotation = normalizeSide(parseInt(tile.rotation ?? 0));
+  const stackSide = boardSide >= 0 && boardSide < 6 ? normalizeSide(boardSide - rotation) : boardSide;
+  const sideText = stackSide === boardSide
+    ? `T${tileId}, side ${boardSide}`
+    : `T${tileId}, edge side ${boardSide} (stack side ${stackSide})`;
+  el.innerHTML = `<span class="stat-label">People token</span><span class="val">${sideText}</span>`;
+}
+
+/** Valid target_tile rings for Adapt slot index (matches AdoptPhaseHandler). */
+function adaptRingHint(slotIndex) {
+  if (slotIndex === 0) return 'inner · T0';
+  if (slotIndex >= 1 && slotIndex <= 6) return 'middle · T1–6';
+  return 'outer · T7–10';
+}
+
+const ADAPT_SLOT_COUNT = 11;
+
+/**
+ * 前四种与棋盘 hex stack 色一致（typeColors）；Works=Agora 侧 DevA 蓝、Agora=DevB 粉。
+ * Develop / Transform 略暗沉黄、暗红；二者为非栈独立 feedback。
+ */
+function adaptTokenDotStyle(effectStr) {
+  const s = String(effectStr);
+  const map = {
+    TURN_WILD: typeColors.Wild,
+    LOSE_COHESION: typeColors.Waste,
+    TURN_WASTE: typeColors.DevA,
+    SOLVE_DISRUPTION: typeColors.DevB,
+    DEVELOP_STACK: '#c9a227',
+    TRANSFORM_STACK: '#b91c1c',
+    UNKNOWN: '#64748b'
+  };
+  const bg = map[s] || '#64748b';
+  return `background:${bg}`;
+}
+
+function renderAdaptPanel(adapt) {
+  const side = document.getElementById('adaptSidebar');
+  const vis = document.getElementById('adaptTrackVisual');
+  if (!side || !vis) return;
+
+  const a = adapt || {};
+  const complete = !!a.complete;
+  const rawTrack = Array.isArray(a.track) ? a.track : [];
+  const hasPayload = rawTrack.length > 0;
+  const cursorClamped = Math.max(0, Math.min(ADAPT_SLOT_COUNT - 1, Number(a.cursor ?? 0)));
+
+  side.classList.toggle('adapt-idle', !hasPayload);
+
+  const padded = [];
+  for (let i = 0; i < ADAPT_SLOT_COUNT; i++) {
+    padded.push(i < rawTrack.length ? rawTrack[i] : null);
+  }
+
+  let ptrRow = '<div class="adapt-ptr-row">';
+  let slotRow = '<div class="adapt-slots-row">';
+  for (let i = 0; i < ADAPT_SLOT_COUNT; i++) {
+    const tok = padded[i];
+    const isCur = !complete && i === cursorClamped;
+    const plainTitle = `${i}: ${tok == null ? 'empty' : String(tok)} · ${adaptRingHint(i)}`;
+    const developCls = tok != null && String(tok) === 'DEVELOP_STACK' ? ' adapt-dot--develop' : '';
+    const dotHtml = tok == null
+      ? '<span class="adapt-dot adapt-dot--empty"></span>'
+      : `<span class="adapt-dot${developCls}" style="${adaptTokenDotStyle(tok)}"></span>`;
+    ptrRow += `<div class="adapt-ptr-cell"><span class="adapt-ptr${isCur ? ' on' : ''}">▲</span></div>`;
+    slotRow +=
+      `<div class="adapt-slot${isCur ? ' current' : ''}${tok == null ? ' idle' : ''}" title="${escHtml(plainTitle)}">` +
+      `<span class="si">${i}</span>` +
+      `<div class="adapt-dot-wrap">${dotHtml}</div>` +
+      `</div>`;
+  }
+  ptrRow += '</div>';
+  slotRow += '</div>';
+  vis.innerHTML = ptrRow + slotRow;
+}
+
+function renderDisruption(d) {
+  const bar = document.getElementById('disruptionBar');
+  if (!d) { bar.classList.remove('active'); return; }
+  bar.classList.add('active');
+  document.getElementById('disruptName').textContent = d.name || '?';
+  document.getElementById('disruptCat').textContent = d.category || '?';
+  document.getElementById('disruptCancel').textContent = d.cancellable ? 'Yes' : 'No';
+}
+
+function log(msg, type) {
+  const box = document.getElementById('logBox');
+  const ts = new Date().toLocaleTimeString();
+  const cls = type === 'ok' ? 'log-ok' : type === 'err' ? 'log-err' : type === 'req' ? 'log-req' : '';
+  box.innerHTML = `<span class="${cls}">[${ts}] ${escHtml(msg)}</span>\n` + box.innerHTML;
+}
+
+function roomResponseSummary(data) {
+  const ctrl = data?.snapshot?.controller || data?.controller || {};
+  const msgCount = Array.isArray(data?.messages) ? data.messages.length : 0;
+  return {
+    sessionId: data?.sessionId,
+    connId: data?.connId,
+    playerId: data?.playerId,
+    roomState: data?.roomState,
+    messages: msgCount,
+    phase: ctrl.phase,
+    currentPlayer: ctrl.next_player_id
+  };
+}
+
+function roomMessageSummary(message) {
+  if (!message || typeof message !== 'object') return message;
+  if (message.gameState || message.controller) {
+    const ctrl = typeof message.controller === 'string'
+      ? JSON.parse(message.controller)
+      : (message.controller || {});
+    return {
+      type: 'snapshot_broadcast',
+      phase: ctrl.phase,
+      currentPlayer: ctrl.next_player_id,
+      round: ctrl.round,
+      gameOver: ctrl.gameOver
+    };
+  }
+  return message;
+}
+
+function logRoomMessages(messages) {
+  if (!Array.isArray(messages)) return;
+  messages.forEach(m => log('room message: ' + JSON.stringify(roomMessageSummary(m), null, 0), 'ok'));
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+async function fetchState() {
+  try {
+    const res = await fetch(API + '/state');
+    const data = await res.json();
+    const snapshot = data?.snapshot ?? data;
+
+    let gs = snapshot?.gameState ?? {};
+    let ctrl = snapshot?.controller ?? null;
+
+    if (typeof gs === 'string') {
+      gs = JSON.parse(gs);
+    }
+    if (typeof ctrl === 'string') {
+      ctrl = JSON.parse(ctrl);
+    }
+
+    const sid = snapshot.sessionId;
+    if (typeof sid === 'string' && sid.length > 0) {
+      if (lastServerSessionId !== null && sid !== lastServerSessionId) {
+        clearWalkRouteOverlay();
+      }
+      lastServerSessionId = sid;
+    }
+
+    // Only replace lastPayload / route highlight when this response actually carries a payload array.
+    // GET /state usually has no message — must not clear walkPathHighlight set by the last walk_path POST.
+    if (Array.isArray(data?.message?.payload)) {
+      lastPayload = data.message.payload;
+      walkPathHighlight = buildWalkHighlightFromPayload(lastPayload);
+    } else if (Array.isArray(data?.payload)) {
+      lastPayload = data.payload;
+      walkPathHighlight = buildWalkHighlightFromPayload(lastPayload);
+    }
+
+    if (ctrl) {
+      ctrl = {
+        ...ctrl,
+        currentPlayerId: ctrl.currentPlayerId ?? ctrl.next_player_id
+      };
+    }
+
+    console.log('parsed gameState =', gs);
+    console.log('parsed controller =', ctrl);
+    console.log('payload =', lastPayload);
+
+    renderBoard(gs.board || [], gs.peopleToken, lastPayload);
+    renderTokenInfo(gs.peopleToken, gs.board || []);
+    renderAdaptPanel(gs.adapt);
+    renderParams(gs.params || {});
+    renderPool(gs.pool || {});
+    renderBag(gs.tokenBagBreakdown, gs.tokenBagCount);
+    renderPlayers(gs.players || [], ctrl ? ctrl.currentPlayerId : undefined);
+    renderCtrl(ctrl);
+    renderDisruption(gs.activeDisruption || null);
+
+    log('State refreshed', 'ok');
+  } catch (e) {
+    console.error(e);
+    log('Fetch error: ' + e.message, 'err');
+  }
+}
+
+async function joinRoom() {
+  try {
+    const res = await fetch(API + '/join', { method: 'POST' });
+    const data = await res.json();
+    roomSessionId = data.sessionId || '';
+    roomConnId = data.connId ?? null;
+    roomPlayerId = data.playerId ?? null;
+    if (roomSessionId) localStorage.setItem('cybernationRoomSessionId', roomSessionId);
+    updateRoomSessionInfo();
+    log('← POST /join ' + JSON.stringify(roomResponseSummary(data), null, 0), res.ok ? 'ok' : 'err');
+    logRoomMessages(data.messages);
+    await fetchState();
+  } catch (e) {
+    log('Join error: ' + e.message, 'err');
+  }
+}
+
+async function startRoom() {
+  if (!roomSessionId) {
+    log('Join room first: no sessionId', 'err');
+    return;
+  }
+  try {
+    const res = await fetch(API + '/start', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ sessionId: roomSessionId })
+    });
+    const data = await res.json();
+    log('← POST /start ' + JSON.stringify(roomResponseSummary(data), null, 0), res.ok ? 'ok' : 'err');
+    logRoomMessages(data.messages);
+    await fetchState();
+  } catch (e) {
+    log('Start error: ' + e.message, 'err');
+  }
+}
+
+async function pollMessages() {
+  if (!roomSessionId) {
+    log('Join room first: no sessionId', 'err');
+    return;
+  }
+  try {
+    const res = await fetch(API + '/messages?sessionId=' + encodeURIComponent(roomSessionId));
+    const data = await res.json();
+    log('← GET /messages ' + JSON.stringify(roomResponseSummary(data), null, 0), res.ok ? 'ok' : 'err');
+    logRoomMessages(data.messages);
+    await fetchState();
+  } catch (e) {
+    log('Poll error: ' + e.message, 'err');
+  }
+}
+
+async function sendAction() {
+  const endpoint = '/action';
+  const useRaw = document.getElementById('useRawRequestToggle').checked;
+  let body;
+
+  if (useRaw) {
+    const raw = document.getElementById('rawRequestInput').value;
+    try {
+      body = JSON.parse(raw);
+      if (!body || typeof body !== 'object' || Array.isArray(body))
+        throw new Error('raw request must be a JSON object');
+    } catch (e) {
+      log('Raw JSON parse error: ' + e.message, 'err');
+      return;
+    }
+    if (!body.sessionId) body.sessionId = roomSessionId;
+  } else {
+    const type = document.getElementById('actionTypeInput').value.trim();
+    let params = {};
+    try { params = JSON.parse(document.getElementById('paramsInput').value); } catch(e) {}
+    body = { sessionId: roomSessionId, type, params };
+  }
+
+  if (!roomSessionId) {
+    log('Join room first: no sessionId', 'err');
+    validateControlledInputs(body);
+    return;
+  }
+
+  validateControlledInputs(body);
+
+  log('→ POST ' + endpoint + ' ' + JSON.stringify(body), 'req');
+  try {
+    const res = await fetch(API + endpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    logRoomMessages(data.messages);
+    const status = res.ok ? 'ok' : 'err';
+    log('← ' + JSON.stringify(roomResponseSummary(data), null, 0), status);
+
+    const msgType = data.message && data.message.type;
+    const payload = data.message && data.message.payload;
+    if (data.status === 0 && msgType === 'walkPath' && Array.isArray(payload)) {
+      lastPayload = payload;
+      walkPathHighlight = buildWalkHighlightFromPayload(payload);
+    } else {
+      walkPathHighlight = null;
+    }
+
+    if (typeof data.sessionId === 'string' && data.sessionId.length > 0) {
+      lastServerSessionId = data.sessionId;
+    }
+
+    await fetchState();
+  } catch(e) {
+    log('Error: ' + e.message, 'err');
+  }
+}
+
+function quickAction(type) {
+  document.getElementById('actionTypeInput').value = type;
+  if (type === 'pass' || type === 'advance') {
+    document.getElementById('paramsInput').value = '{}';
+  }
+}
+
+document.getElementById('sendBtn').onclick = sendAction;
+document.getElementById('refreshBtn').onclick = fetchState;
+document.getElementById('modeToggleBtn').onclick = toggleRoundControlMode;
+document.getElementById('joinRoomBtn').onclick = joinRoom;
+document.getElementById('startRoomBtn').onclick = startRoom;
+document.getElementById('pollMessagesBtn').onclick = pollMessages;
+document.getElementById('applySuggestBtn').onclick = () => applySuggestionsToInputs(true);
+document.getElementById('phaseSelect').addEventListener('change', renderQuickActions);
+document.getElementById('playerIdInput').addEventListener('input', () => validateControlledInputs());
+document.getElementById('actionTypeInput').addEventListener('input', () => validateControlledInputs());
+document.getElementById('useRawRequestToggle').addEventListener('change', () => validateControlledInputs());
+document.getElementById('rawRequestInput').addEventListener('input', () => {
+  if (!document.getElementById('useRawRequestToggle').checked) return;
+  try {
+    const body = JSON.parse(document.getElementById('rawRequestInput').value);
+    if (body && typeof body === 'object' && !Array.isArray(body)) {
+      validateControlledInputs(body);
+      return;
+    }
+  } catch (_) {}
+  validateControlledInputs();
+});
+document.getElementById('clearRouteBtn').onclick = () => {
+  clearWalkRouteOverlay();
+  fetchState();
+};
+
+document.getElementById('actionTypeInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendAction();
+});
+document.getElementById('paramsInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendAction();
+});
+document.getElementById('rawRequestInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendAction();
+});
+
+setModeUI();
+renderQuickActions();
+</script>
+</body>
+</html>

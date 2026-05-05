@@ -1,0 +1,259 @@
+[
+    {
+        "id": 0,        
+        "name" : "Restore and Rewild",
+        "victory_condition": {
+            "stack": 
+            {
+                "Wild": {
+                    "compare" : "EQ",
+                    "num" : 11 
+                }
+            },
+            "HR": {
+                "compare" : "GE",
+                "num": 11
+            }
+        },
+        "start_effect": {
+            "DevA":  [7],
+            "DevB":  [0],
+            "Waste": [2]
+        },
+        "reverseGoalId": 1
+    },
+    {
+        "id": 1,        
+        "name" : "Dominate the Land",
+        "victory_condition": {
+            "stack" : {
+                "Wild" : {
+                    "compare" : "EQ",
+                    "num" : 0
+                }
+            },
+            "Co" : {
+                "compare": "GE",
+                "num": 10
+            }
+        },
+        "start_effect": {
+            "DevB":  [0],
+            "Wild":  [2,7]
+        },
+        "reverseGoalId": 0
+    },
+    {
+        "id": 2,        
+        "name" : "Prepare for the Worst",
+        "victory_condition": {
+            "stack" : {
+                "Wild" : {
+                    "compare": "GE",
+                    "num": 2
+                },
+                "DevA": {
+                    "compare": "GE",
+                    "num": 3
+                }
+            },
+            "Cy" : {
+                "compare": "GE",
+                "num": 7
+            }
+        },
+        "start_effect": {
+            "DevA":  [8],
+            "Waste": [0,3]
+        },
+        "reverseGoalId": 3
+    },
+    {
+        "id": 3,        
+        "name" : "Each to their Own",
+        "victory_condition": {
+            "stack" : {
+                "DevB" : {
+                    "compare": "GE",
+                    "num": 6
+                },
+                "DevA": {
+                    "compare": "EQ",
+                    "num": 0
+                }
+            },
+            "Cy" : {
+                "compare": "EQ",
+                "num": 0
+            }
+        },
+        "start_effect": {
+            "DevB":  [8],
+            "Waste": [0,3]
+        },
+        "reverseGoalId": 2
+    },
+    {
+        "id": 4,        
+        "name" : "Reconnect",
+        "victory_condition": {
+            "stack" : {
+                "Waste": {
+                    "compare": "EQ",
+                    "num": 0
+                }
+            },
+            "HR" : {
+                "compare": "GE",
+                "num": 12
+            },
+            "Tech" : {
+                "compare": "GE",
+                "num": 12
+            },
+            "Env" : {
+                "compare": "GE",
+                "num": 12
+            }
+        },
+        "start_effect": {
+            "Waste": [0,7,8,9,10]
+        },
+        "reverseGoalId": 5
+    },
+
+    {
+        "id": 5,        
+        "name" : "Ransack",
+        "victory_condition": {
+            "stack" : {
+                "Waste": {
+                    "compare": "EQ",
+                    "num": 11
+                }
+            },
+            "HR" : {
+                "compare": "GE",
+                "num": 5
+            },
+            "Tech" : {
+                "compare": "GE",
+                "num": 5
+            },
+            "Env" : {
+                "compare": "GE",
+                "num": 5
+            }
+        },
+        "start_effect": {
+            "Wild": [0],
+            "DevB": [7,10],
+            "DevA": [8,9]
+        },
+        "reverseGoalId": 4
+    },
+    {
+        "id": 6,        
+        "name" : "Equity",
+        "victory_condition": {
+            "stack" : {
+                "DevA": {
+                    "position": "outer",
+                    "compare": "EQ",
+                    "num": 4
+                },
+                "Wild": {
+                    "position": "middle",
+                    "compare": "GE",
+                    "num": 3
+                }
+            },
+            "Cy": {
+                "compare": "GE",
+                "num": 4
+            }
+        },
+        "start_effect": {
+            "Waste": [2,5],
+            "Wild": [9]
+        },
+        "reverseGoalId": 7
+    },
+
+    {
+        "id": 7,        
+        "name" : "Inequity",
+        "victory_condition": {
+            "stack" : {
+                "DevA": {
+                    "position": "inner",
+                    "compare": "EQ",
+                    "num": 1
+                },
+                "Wild": {
+                    "position": "outer",
+                    "compare": "GE",
+                    "num": 3
+                }
+            },
+            "Cy": {
+                "compare": "GE",
+                "num": 4
+            }
+        },
+        "start_effect": {
+            "Waste": [2,5],
+            "Wild": [9]
+        },
+        "reverseGoalId": 6
+    },
+    {
+        "id": 8,        
+        "name" : "Tomorrow through Tech",
+        "victory_condition": {
+            "stack" : {
+                "DevB": {
+                    "position": "inner",
+                    "compare": "EQ",
+                    "num": 1
+                }
+            },
+            "Co": {
+                "compare": "GE",
+                "num": 15
+            }
+        },
+        "start_effect": {
+            "Wild": [2,4],
+            "DevA": [0]
+        },
+        "reverseGoalId": 9
+    },
+
+    {
+        "id": 9,        
+        "name" : "Back to Nature",
+        "victory_condition": {
+            "stack" : {
+                "DevB": {
+                    "compare": "EQ",
+                    "num": 0
+                },
+                "Wild": {
+                    "compare": "GE",
+                    "num": 6
+                }
+            },
+            "Co": {
+                "compare": "GE",
+                "num": 20
+            }
+        },
+        "start_effect": {
+            "Wild":  [10],
+            "DevA":  [2,4],
+            "Waste": [0]
+        },
+        "reverseGoalId": 8
+    }
+]

@@ -159,6 +159,7 @@ public partial class MainUI : Control
 	private TurnDotsView _turnDotsView = null!;
 	private PlayerPanelView _playerPanelView = null!;
 	private PlayerDetailPopupView _playerDetailPopupView = null!;
+	private GameStartOverlayView _gameStartOverlayView = null!;
 
 	private Button _colorblindToggleButton = null!;
 	private ColorRect _colorblindFilter = null!;
@@ -172,7 +173,7 @@ public partial class MainUI : Control
 	public GameGatewayMode GatewayMode { get; set; } = GameGatewayMode.RestServer;
 
 	[Export]
-	public string ServerUrl { get; set; } = "http://127.0.0.1:8080";
+	public string ServerUrl { get; set; } = "http://127.0.0.1:8081";
 
 	public override void _Ready()
 	{
@@ -182,6 +183,7 @@ public partial class MainUI : Control
 		_infoSummaryPanelView = GetNode<InfoSummaryPanelView>("UIMain/InfoSummaryPanel");
 		_playerPanelView = GetNode<PlayerPanelView>("UIMain/PlayerPanel");
 		_playerDetailPopupView = GetNode<PlayerDetailPopupView>("UIMain/Popups/PlayerDetailPopup");
+		_gameStartOverlayView = GetNode<GameStartOverlayView>("UIMain/GameStartOverlay");
 		_hiveBoardView = GetNode<HiveBoardView>("World/GameBoard");
 		_resourceTracksView = GetNode<ResourceTracksView>("UIMain/ResourceTracks");
 		_nationLevelBadgeView = GetNode<NationLevelBadgeView>("UIMain/NationLevelBadge");
@@ -232,6 +234,7 @@ public partial class MainUI : Control
 			_turnDotsView,
 			_playerPanelView,
 			_playerDetailPopupView,
+			_gameStartOverlayView,
 			_envisionController,
 			_gameGateway
 		);

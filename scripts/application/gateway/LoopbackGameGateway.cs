@@ -69,6 +69,9 @@ public sealed class LoopbackGameGateway : IGameGateway
 			case PacketTypes.CmdSnapshotRequest:
 				EmitSnapshotFull(envelope);
 				break;
+			case PacketTypes.CmdGameStartRequest:
+				HandleGameStartRequest(envelope);
+				break;
 			case PacketTypes.CmdChatSubmit:
 				HandleChatSubmit(envelope);
 				break;
@@ -114,6 +117,16 @@ public sealed class LoopbackGameGateway : IGameGateway
 
 		_chatMessages.Add(new ChatMessageVm(payload.sender, trimmed));
 		EmitChatSync(envelope);
+	}
+
+	private void HandleGameStartRequest(in PacketEnvelope envelope)
+	{
+		EmitSnapshotFull(envelope);
+		EmitEvent(
+			PacketTypes.EvtGameStartState,
+			envelope,
+			new GameStartStatePayload(true, 0, "loopback-session", "PLAYING", "Loopback game started.")
+		);
 	}
 
 	private void EmitPlayerDetail(in PacketEnvelope envelope)

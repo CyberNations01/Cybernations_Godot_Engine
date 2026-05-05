@@ -9,6 +9,7 @@ public static class PacketTypes
     public const string CmdInfoSummaryDetailRequest = "cmd.info_summary.detail.request";
     public const string CmdEnvisionAction = "cmd.envision.action";
     public const string CmdDevConsoleCommand = "cmd.dev_console.command";
+    public const string CmdGameStartRequest = "cmd.game_start.request";
 
     public const string EvtSnapshotFull = "evt.snapshot.full";
     public const string EvtChatSync = "evt.chat.sync";
@@ -18,5 +19,6 @@ public static class PacketTypes
     public const string EvtHiveBoardState = "evt.hive_board.state";
     public const string EvtEnvisionState = "evt.envision.state";
     public const string EvtDevConsoleResult = "evt.dev_console.result";
+    public const string EvtGameStartState = "evt.game_start.state";
     public const string EvtError = "evt.error";
 }

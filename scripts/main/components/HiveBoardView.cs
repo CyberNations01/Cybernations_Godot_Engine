@@ -16,19 +16,20 @@ public partial class HiveBoardView : Node2D, IHiveBoardView
 
 	public event Action<BoardPathHoverVm?>? PathHovered;
 
+	// Board position numbering follows ServerForTest/data/layout.json and the T0-T10 reference diagram.
 	private readonly TilePlacement[] _defaultPlacements =
 	[
-		new TilePlacement(0, new Vector2(0, 0), StackView.TileKind.Wilds, null),
-		new TilePlacement(1, new Vector2(348, 0), StackView.TileKind.Wilds, null),
-		new TilePlacement(2, new Vector2(696, 0), StackView.TileKind.Wilds, null),
-		new TilePlacement(3, new Vector2(174, 100), StackView.TileKind.Wasted, null),
-		new TilePlacement(4, new Vector2(522, 100), StackView.TileKind.Wilds, null),
-		new TilePlacement(5, new Vector2(348, 200), StackView.TileKind.Wilds, StackView.TileKind.Human),
-		new TilePlacement(6, new Vector2(522, 300), StackView.TileKind.Wasted, StackView.TileKind.Human),
-		new TilePlacement(7, new Vector2(174, 300), StackView.TileKind.Wilds, null),
-		new TilePlacement(8, new Vector2(0, 400), StackView.TileKind.Wilds, null),
-		new TilePlacement(9, new Vector2(348, 400), StackView.TileKind.Wasted, StackView.TileKind.Technology),
-		new TilePlacement(10, new Vector2(696, 400), StackView.TileKind.Wasted, StackView.TileKind.Technology),
+		new TilePlacement(0, new Vector2(348, 200), StackView.TileKind.Wilds, StackView.TileKind.Technology),
+		new TilePlacement(1, new Vector2(348, 0), StackView.TileKind.Wasted, null),
+		new TilePlacement(2, new Vector2(522, 100), StackView.TileKind.Wilds, null),
+		new TilePlacement(3, new Vector2(522, 300), StackView.TileKind.Wilds, StackView.TileKind.Technology),
+		new TilePlacement(4, new Vector2(348, 400), StackView.TileKind.Wilds, StackView.TileKind.Human),
+		new TilePlacement(5, new Vector2(174, 300), StackView.TileKind.Wilds, null),
+		new TilePlacement(6, new Vector2(174, 100), StackView.TileKind.Wilds, null),
+		new TilePlacement(7, new Vector2(0, 0), StackView.TileKind.Wilds, null),
+		new TilePlacement(8, new Vector2(696, 0), StackView.TileKind.Wilds, null),
+		new TilePlacement(9, new Vector2(0, 400), StackView.TileKind.Wilds, StackView.TileKind.Technology),
+		new TilePlacement(10, new Vector2(696, 400), StackView.TileKind.Wasted, null),
 	];
 
 	public override void _Ready()

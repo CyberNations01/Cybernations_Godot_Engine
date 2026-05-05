@@ -17,6 +17,7 @@ public sealed class MainUiPresenter : IDisposable
 	private readonly ITurnDotsView _turnDotsView;
 	private readonly IPlayerPanelView _playerPanelView;
 	private readonly IPlayerDetailPopupView _playerDetailPopupView;
+	private readonly IGameStartOverlayView _gameStartOverlayView;
 	private readonly IGameGateway _gateway;
 	private readonly Dictionary<int, Vector2> _pendingPlayerDetailPositions = [];
 
@@ -44,6 +45,7 @@ public sealed class MainUiPresenter : IDisposable
 		ITurnDotsView turnDotsView,
 		IPlayerPanelView playerPanelView,
 		IPlayerDetailPopupView playerDetailPopupView,
+		IGameStartOverlayView gameStartOverlayView,
 		EnvisionController envisionController,
 		IGameGateway gateway
 	)
@@ -57,6 +59,7 @@ public sealed class MainUiPresenter : IDisposable
 		_turnDotsView = turnDotsView;
 		_playerPanelView = playerPanelView;
 		_playerDetailPopupView = playerDetailPopupView;
+		_gameStartOverlayView = gameStartOverlayView;
 		_gateway = gateway;
 		_envisionController = envisionController;
 	}
@@ -78,6 +81,7 @@ public sealed class MainUiPresenter : IDisposable
 		_infoSummaryPanelView.CloseRequested += OnInfoSummaryCloseRequested;
 
 		_playerDetailPopupView.CloseRequested += OnPlayerDetailCloseRequested;
+		_gameStartOverlayView.StartRequested += OnGameStartRequested;
 		_gateway.ServerPacketReceived += OnServerPacketReceived;
 		_hiveBoardView.PathHovered += OnBoardPathHovered;
 
@@ -85,16 +89,10 @@ public sealed class MainUiPresenter : IDisposable
 		_teamGoalPanelView.SetDropdownVisible(false);
 		_infoSummaryPanelView.SetDropdownVisible(false);
 		_playerDetailPopupView.HidePopup();
+		_gameStartOverlayView.SetOverlayVisible(true);
+		_gameStartOverlayView.SetStatus("Click anywhere or press any key to join the game.", false);
 
 		_gateway.Initialize();
-		_gateway.SendPacket(
-			GamePacketCodec.BuildCommand(
-				PacketTypes.CmdSnapshotRequest,
-				LocalRoomId,
-				LocalPlayerId,
-				new EmptyPayload()
-			)
-		);
 		_isBound = true;
 	}
 
@@ -136,9 +134,23 @@ public sealed class MainUiPresenter : IDisposable
 		_infoSummaryPanelView.CloseRequested -= OnInfoSummaryCloseRequested;
 
 		_playerDetailPopupView.CloseRequested -= OnPlayerDetailCloseRequested;
+		_gameStartOverlayView.StartRequested -= OnGameStartRequested;
 		_gateway.ServerPacketReceived -= OnServerPacketReceived;
 		_hiveBoardView.PathHovered -= OnBoardPathHovered;
 		_isBound = false;
+	}
+
+	private void OnGameStartRequested()
+	{
+		_gameStartOverlayView.SetStatus("Joining room and starting game...", true);
+		_gateway.SendPacket(
+			GamePacketCodec.BuildCommand(
+				PacketTypes.CmdGameStartRequest,
+				LocalRoomId,
+				LocalPlayerId,
+				new GameStartRequestPayload()
+			)
+		);
 	}
 
 	private void OnChatExpandRequested()
@@ -316,6 +328,9 @@ public sealed class MainUiPresenter : IDisposable
 				break;
 			case PacketTypes.EvtDevConsoleResult:
 				ApplyDevConsoleResult(envelope);
+				break;
+			case PacketTypes.EvtGameStartState:
+				ApplyGameStartState(envelope);
 				break;
 			case PacketTypes.EvtError:
 				ApplyError(envelope);
@@ -708,7 +723,7 @@ public sealed class MainUiPresenter : IDisposable
 		};
 	}
 
-	private static void ApplyError(in PacketEnvelope envelope)
+	private void ApplyError(in PacketEnvelope envelope)
 	{
 		if (!GamePacketCodec.TryDeserializePayload<ErrorPayload>(envelope, out var payload))
 		{
@@ -716,7 +731,34 @@ public sealed class MainUiPresenter : IDisposable
 			return;
 		}
 
+		if (_gameStartOverlayView.IsOverlayVisible)
+		{
+			_gameStartOverlayView.SetStatus($"Could not start game: {payload.reason}", false);
+		}
+
 		GD.PushWarning($"MainUiPresenter: server error code={payload.code}, reason={payload.reason}, req_id={envelope.req_id ?? "none"}");
+	}
+
+	private void ApplyGameStartState(in PacketEnvelope envelope)
+	{
+		if (!GamePacketCodec.TryDeserializePayload<GameStartStatePayload>(envelope, out var payload))
+		{
+			return;
+		}
+
+		if (payload.started)
+		{
+			_gameStartOverlayView.SetOverlayVisible(false);
+			_chatPanelView.AddMessage(
+				new ChatMessageVm(
+					"Server",
+					$"Joined as Player {payload.player_id + 1}. Room state: {payload.room_state}."
+				)
+			);
+			return;
+		}
+
+		_gameStartOverlayView.SetStatus(payload.status_message, false);
 	}
 
 	private bool TryHandleDeveloperModeInput(string text)
@@ -824,7 +866,7 @@ public sealed class MainUiPresenter : IDisposable
 		_infoSummaryPanelView.SetSummary(
 			"Path Selection",
 			$"Connected path #{value.ComponentId}\n" +
-			$"Hovered edge: Tile {value.TileIndex}, Edge {value.EdgeIndex}\n\n" +
+			$"Hovered edge: T{value.TileIndex}, Edge {value.EdgeIndex}\n\n" +
 			$"Gain from this connected path:\n" +
 			$"Human: +{resources.Human}\n" +
 			$"Tech: +{resources.Technology}\n" +

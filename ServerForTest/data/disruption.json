@@ -1,0 +1,581 @@
+[
+    {
+        "name": "HURRICANE_1",
+        "category": "CatA",
+        "description": "For each affected Stack, turn into waste unless pay 1 cybernation level",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [0, 1, 5, 8, 10],
+        "effect": [{"TurnWaste": 1}],
+        "cost": [{"Cy": -1}],
+        "cancel": true
+    },
+    {
+        "name": "HURRICANE_2",
+        "category": "CatA",
+        "description": "For each affected Stack, turn into waste unless pay 1 cybernation level",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [0, 3, 6, 7, 9],
+        "effect": [{"TurnWaste": 1}],
+        "cost": [{"Cy": -1}],
+        "cancel": true
+    },
+    {
+        "name": "WILDFIRES_1",
+        "category": "CatA",
+        "description": "Turn stack into waste unless pay 1 cybernation level",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [0, 2, 3, 4],
+        "effect": [{"TurnWaste": 1}],
+        "cost": [{"Cy": -1}],
+        "cancel": true
+    },
+    {
+        "name": "WILDFIRES_2",
+        "category": "CatA",
+        "description": "Turn stack into waste unless pay 1 cybernation level",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [0, 1, 5, 6],
+        "effect": [{"TurnWaste": 1}],
+        "cost": [{"Cy": -1}],
+        "cancel": true
+    },
+    {
+        "name": "VOLCANIC_ASH_1",
+        "category": "CatA",
+        "description": "Turn stack into wild unless pay 1 cybernation level",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [0, 5, 6, 7, 10],
+        "effect": [{"TurnWild": 1}],
+        "cost": [{"Cy": -1}],
+        "cancel": true
+    },
+    {
+        "name": "VOLCANIC_ASH_2",
+        "category": "CatA",
+        "description": "Turn stack into wild unless pay 1 cybernation level",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [0, 2, 3, 8, 9],
+        "effect": [{"TurnWild": 1}],
+        "cost": [{"Cy": -1}],
+        "cancel": true
+    },
+    {
+        "name": "FLOODS_1",
+        "category": "CatA",
+        "description": "Turn stack into wild unless pay 1 cybernation level",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [0, 1, 2, 4],
+        "effect": [{"TurnWild": 1}],
+        "cost": [{"Cy": -1}],
+        "cancel": true
+    },
+    {
+        "name": "FLOODS_2",
+        "category": "CatA",
+        "description": "Turn stack into wild unless pay 1 cybernation level",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [0, 3, 5, 6],
+        "effect": [{"TurnWild": 1}],
+        "cost": [{"Cy": -1}],
+        "cancel": true
+    },
+
+
+    {
+        "name": "RISING_CRIME_1",
+        "category": "CatB",
+        "description": "Lose 2 cohesion",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [],
+        "effect": [{"Co": -2}],
+        "cost": [{"Cy": -1}],
+        "cancel": true
+    },
+    {
+        "name": "RISING_CRIME_2",
+        "category": "CatB",
+        "description": "Lose 2 cohesion",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [],
+        "effect": [{"Co": -2}],
+        "cost": [{"Cy": -1}],
+        "cancel": true
+    },
+    {
+        "name": "RAMPANT_DISINFORMATION_1",
+        "category": "CatB",
+        "description": "Lose 2 cohesion",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [],
+        "effect": [{"Co": -2}],
+        "cost": [{"HR": -2}],
+        "cancel": true
+    },
+    {
+        "name": "RAMPANT_DISINFORMATION_2",
+        "category": "CatB",
+        "description": "Lose 2 cohesion",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [],
+        "effect": [{"Co": -2}],
+        "cost": [{"HR": -2}],
+        "cancel": true
+    },
+    {
+        "name": "TECH_MEDIATED_ISOLATION_1",
+        "category": "CatB",
+        "description": "If Technology > Human Relation, cohesion -2",
+        "conditionType": "resource",
+        "condition": { "lhs": "Tech", "rhs": "HR", "compare": "GT" },
+        "stackTarget": [],
+        "effect": [{"Co": -2}],
+        "cost": [{"Cy": -1}],
+        "cancel": true
+    },
+    {
+        "name": "TECH_MEDIATED_ISOLATION_2",
+        "category": "CatB",
+        "description": "If Technology > Human Relation, cohesion -2",
+        "conditionType": "resource",
+        "condition": { "lhs": "Tech", "rhs": "HR", "compare": "GT" },
+        "stackTarget": [],
+        "effect": [{"Co": -2}],
+        "cost": [{"Cy": -1}],
+        "cancel": true
+    },
+    {
+        "name": "AIR_POLLUTION_SPIKE",
+        "category": "CatB",
+        "description": "For each developed stack, decrement 2 cohesion",
+        "conditionType": "stack",
+        "condition": { "stackType": ["DevA", "DevB"] },
+        "stackTarget": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        "effect": [{"Co": -2}],
+        "cost": [{"Co": -2}],
+        "cancel": true
+    },
+    {
+        "name": "DISEASE_OUTBREAK",
+        "category": "CatB",
+        "description": "For each developed stack, decrement 2 cohesion",
+        "conditionType": "stack",
+        "condition": { "stackType": ["DevA", "DevB"] },
+        "stackTarget": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        "effect": [{"Co": -2}],
+        "cost": [{"Cy": -1}],
+        "cancel": true
+    },
+
+
+
+    {
+        "name": "CLIMATE_MIGRATION",
+        "category": "CatC",
+        "description": "If the affected Stack is DevA/B, turn into waste and cohesion -1",
+        "conditionType": "stack",
+        "condition": { "stackType": ["DevA", "DevB"] },
+        "stackTarget": [0],
+        "effect": [{"Co": -1}, {"TurnWaste": 1}],
+        "cost": [{"Cy": -1}],
+        "cancel": true
+    },
+    {
+        "name": "ARIDIFICATION",
+        "category": "CatC",
+        "description": "If the affected Stack is DevA/B, turn into waste and cohesion -1",
+        "conditionType": "stack",
+        "condition": { "stackType": ["DevA", "DevB"] },
+        "stackTarget": [1, 2, 3, 4, 5, 6],
+        "effect": [{"Co": -1}, {"TurnWaste": 1}],
+        "cost": [{"Cy": -1}],
+        "cancel": true
+    },
+    {
+        "name": "RISING_SEA_LEVELS",
+        "category": "CatC",
+        "description": "If the affected Stack is DevA/B, turn into waste and cohesion -1",
+        "conditionType": "stack",
+        "condition": { "stackType": ["DevA", "DevB"] },
+        "stackTarget": [7, 8, 9, 10],
+        "effect": [{"Co": -1}, {"TurnWaste": 1}],
+        "cost": [{"Cy": -1}],
+        "cancel": true
+    },
+
+
+
+
+
+
+    {
+    "name": "GLACIAL_MELT",
+    "description": "If the selected stack is Wild, flip it -> become waste",
+    "category": "CatD",
+    "conditionType": "stack",
+    "condition": { "stackType": ["Wild"] },
+    "stackTarget": [0],
+    "effect": [{"TurnWaste": 1}],
+    "cost": [{"Cy": -1}],
+    "cancel": true
+  },
+  {
+    "name": "DESERTIFICATION",
+    "description": "If the selected stack is Wild, flip it -> become waste",
+    "category": "CatD",
+    "conditionType": "stack",
+    "condition": { "stackType": ["Wild"] },
+    "stackTarget": [1, 2, 3, 4, 5, 6],
+    "effect": [{"TurnWaste": 1}],
+    "cost": [{"Cy": -1}],
+    "cancel": true
+  },
+  {
+    "name": "OVERWHELMING_SALINATION",
+    "description": "If the selected stack is Wild, flip it -> become waste",
+    "category": "CatD",
+    "conditionType": "stack",
+    "condition": { "stackType": ["Wild"] },
+    "stackTarget": [7, 8, 9, 10],
+    "effect": [{"TurnWaste": 1}],
+    "cost": [{"Cy": -1}],
+    "cancel": true
+  },
+
+
+
+
+
+
+
+  {
+    "name": "SOCIETAL_SHIFT_1",
+    "description": "Swap Goal",
+    "category": "CatE",
+    "conditionType": "none",
+    "condition": {},
+    "stackTarget": [],
+    "effect": [{"SwapGoal": 1}],
+    "cost": [{"Cy": -2}],
+    "cancel": true
+  },
+  {
+    "name": "SOCIETAL_SHIFT_2",
+    "description": "Swap Goal",
+    "category": "CatE",
+    "conditionType": "none",
+    "condition": {},
+    "stackTarget": [],
+    "effect": [{"SwapGoal": 1}],
+    "cost": [{"Cy": -2}],
+    "cancel": true
+  },
+  {
+    "name": "PARADIGM_SHIFT",
+    "description": "Draw a new Goal card",
+    "category": "CatE",
+    "conditionType": "none",
+    "condition": {},
+    "stackTarget": [],
+    "effect": [{"DrawGoal": 1}],
+    "cost": [{"Cy": -2}],
+    "cancel": true
+  },
+
+
+
+    {
+        "name": "REBIRTH_OF_COMMUNITY_1",
+        "description": "Gain 2 Cohesion, then gain 5 resources distributed across params",
+        "category": "CatF",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [],
+        "effect": [{"Co": 2}, {"Resources": 5}],
+        "cost": [],
+        "cancel": false
+    },
+    {
+        "name": "REBIRTH_OF_COMMUNITY_2",
+        "description": "Gain 2 Cohesion, then gain 5 resources distributed across params",
+        "category": "CatF",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [],
+        "effect": [{"Co": 2}, {"Resources": 5}],
+        "cost": [],
+        "cancel": false
+    },
+    {
+        "name": "WINDFALL_1",
+        "description": "Gain 10 resources distributed across params",
+        "category": "CatF",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [],
+        "effect": [{"Resources": 10}],
+        "cost": [],
+        "cancel": false
+    },
+    {
+        "name": "WINDFALL_2",
+        "description": "Gain 10 resources distributed across params",
+        "category": "CatF",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [],
+        "effect": [{"Resources": 10}],
+        "cost": [],
+        "cancel": false
+    },
+    {
+        "name": "FOCUSSED_RESEARCH_1",
+        "category": "CatG",
+        "description": "For each developed stack, gain 2 relationships or gain 1 cybernation level",
+        "conditionType": "stack",
+        "condition": { "stackType": ["DevA", "DevB"] },
+        "stackTarget": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        "effect": [{"HR": 2}, {"Cy": 1}],
+        "cost": [],
+        "cancel": false
+    },
+    {
+        "name": "FOCUSSED_RESEARCH_2",
+        "category": "CatG",
+        "description": "For each developed stack, gain 2 relationships or gain 1 cybernation level",
+        "conditionType": "stack",
+        "condition": { "stackType": ["DevA", "DevB"] },
+        "stackTarget": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        "effect": [{"Cy": 1}, {"HR": 2}],
+        "cost": [],
+        "cancel": false
+    },
+    {
+        "name": "BIO_INSPIRED_DESIGN_1",
+        "category": "CatG",
+        "description": "For each waste or wild block, gain 1 relation or 1 cybernation level",
+        "conditionType": "stack",
+        "condition": { "stackType": ["Waste", "Wild"] },
+        "stackTarget": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        "effect": [{"Cy": 1}, {"HR": 1}],
+        "cost": [],
+        "cancel": false
+    },
+    {
+        "name": "BIO_INSPIRED_DESIGN_2",
+        "category": "CatG",
+        "description": "For each waste or wild block, gain 1 relation or 1 cybernation level",
+        "conditionType": "stack",
+        "condition": { "stackType": ["Waste", "Wild"] },
+        "stackTarget": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        "effect": [{"Cy": 1}, {"HR": 1}],
+        "cost": [],
+        "cancel": false
+    },
+    {
+        "name": "COMMUNITY_LEADERS_1",
+        "category": "CatH",
+        "description": "Move 1 people token to a new position or gain 2 HumanRelation",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [],
+        "effect": [{"MovePpl": 1}, {"HR": 2}],
+        "cost": [],
+        "cancel": false
+    },
+    {
+        "name": "COMMUNITY_LEADERS_2",
+        "category": "CatH",
+        "description": "Move 1 people token to a new position or gain 2 HumanRelation",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [],
+        "effect": [{"MovePpl": 1}, {"HR": 2}],
+        "cost": [],
+        "cancel": false
+    },
+    {
+        "name": "FUTURES_THINKING_1",
+        "category": "CatH",
+        "description": "Gain 2 cybernation level or draw up to 3 Feedback token",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [],
+        "effect": [{"Cy": 2}, {"Token": 3}],
+        "cost": [],
+        "cancel": false
+    },
+    {
+        "name": "FUTURES_THINKING_2",
+        "category": "CatH",
+        "description": "Gain 2 cybernation level or draw up to 3 Feedback token",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [],
+        "effect": [{"Cy": 2}, {"Token": 3}],
+        "cost": [],
+        "cancel": false
+    },
+    {
+        "name": "FUTURES_THINKING_3",
+        "category": "CatH",
+        "description": "Gain 2 cybernation level or draw up to 3 Feedback token",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [],
+        "effect": [{"Cy": 2}, {"Token": 3}],
+        "cost": [],
+        "cancel": false
+    },
+    {
+        "name": "FUTURES_THINKING_4",
+        "category": "CatH",
+        "description": "Gain 2 cybernation level or draw up to 3 Feedback token",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [],
+        "effect": [{"Cy": 2}, {"Token": 3}],
+        "cost": [],
+        "cancel": false
+    },
+    {
+        "name": "EMPATHY_1",
+        "category": "CatH",
+        "description": "Gain 2 Cohesion, or ignore cohesion effect for this turn",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [],
+        "effect": [{"Co": 2}, {"IgnoreCohesionEffect": 1}],
+        "cost": [],
+        "cancel": false
+    },
+    {
+        "name": "EMPATHY_2",
+        "category": "CatH",
+        "description": "Gain 2 Cohesion, or ignore cohesion effect for this turn",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [],
+        "effect": [{"Co": 2}, {"IgnoreCohesionEffect": 1}],
+        "cost": [],
+        "cancel": false
+    },
+    {
+        "name": "EMPATHY_3",
+        "category": "CatH",
+        "description": "Gain 2 Cohesion, or ignore cohesion effect for this turn",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [],
+        "effect": [{"Co": 2}, {"IgnoreCohesionEffect": 1}],
+        "cost": [],
+        "cancel": false
+    },
+    {
+        "name": "TECHNOLOGY_BREAKTHROUGH_1",
+        "category": "CatI",
+        "description": "Pay 1 HR and 1 Tech to place a DevA tile on an undeveloped Stack",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        "effect": [{"TurnDevA": 1}],
+        "cost": [{"HR": -1}, {"Tech": -1}],
+        "cancel": false
+    },
+    {
+        "name": "TECHNOLOGY_BREAKTHROUGH_2",
+        "category": "CatI",
+        "description": "Pay 1 HR and 1 Tech to place a DevA tile on an undeveloped Stack",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        "effect": [{"TurnDevA": 1}],
+        "cost": [{"HR": -1}, {"Tech": -1}],
+        "cancel": false
+    },
+    {
+        "name": "BLOOM_COVERED_PLATEAUS",
+        "category": "CatJ",
+        "description": "If affected stack is waste, flip it. May pay 1 Env to gain 1 Cy",
+        "conditionType": "stack",
+        "condition": { "stackType": ["Waste"] },
+        "stackTarget": [0],
+        "effect": [{"TurnWild": 1}],
+        "cost": [],
+        "optional": { "cost": [{"Env": -1}], "gain": [{"Cy": 1}] },
+        "cancel": false
+    },
+    {
+        "name": "LUSH_JUNGLES",
+        "category": "CatJ",
+        "description": "For each waste stack, flip it. May pay 1 Env to gain 1 Cy",
+        "conditionType": "stack",
+        "condition": { "stackType": ["Waste"] },
+        "stackTarget": [1, 2, 3, 4, 5, 6],
+        "effect": [{"TurnWild": 1}],
+        "cost": [],
+        "optional": { "cost": [{"Env": -1}], "gain": [{"Cy": 1}] },
+        "cancel": false
+    },
+    {
+        "name": "THRIVING_MANGROVES",
+        "category": "CatJ",
+        "description": "For each waste stack, flip it. May pay 1 Env to gain 1 Cy",
+        "conditionType": "stack",
+        "condition": { "stackType": ["Waste"] },
+        "stackTarget": [7, 8, 9, 10],
+        "effect": [{"TurnWild": 1}],
+        "cost": [],
+        "optional": { "cost": [{"Env": -1}], "gain": [{"Cy": 1}] },
+        "cancel": false
+    },
+        
+    {
+        "name": "NEW_HORIZONS_1",
+        "description": "Trade 1 resource for 1 resource",
+        "category": "CatK",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [],
+        "effect": [{"Trade": 1}],
+        "cost": [],
+        "effectCond": "",
+        "cancel": false
+    },
+    {
+        "name": "NEW_HORIZONS_2",
+        "description": "Trade 1 resource for 1 resource",
+        "category": "CatK",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [],
+        "effect": [{"Trade": 1}],
+        "cost": [],
+        "effectCond": "",
+        "cancel": false
+    },
+    {
+        "name": "NEW_HORIZONS_3",
+        "description": "Trade 1 resource for 1 resource",
+        "category": "CatK",
+        "conditionType": "none",
+        "condition": {},
+        "stackTarget": [],
+        "effect": [{"Trade": 1}],
+        "cost": [],
+        "effectCond": "",
+        "cancel": false
+    }
+
+]

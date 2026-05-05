@@ -112,6 +112,7 @@ public partial class StackView : Node2D
 	private readonly Texture2D?[] _defaultPathTextures = new Texture2D?[6];
 	private readonly float[] _defaultPathRotations = new float[6];
 	private readonly EdgeState[] _edgeStates = new EdgeState[6];
+	private Polygon2D _pathClipMask = null!;
 	private Node2D _generatedPathLayer = null!;
 	private Node2D _resourceLayer = null!;
 	private readonly List<Node> _generatedPathNodes = [];
@@ -371,17 +372,25 @@ public partial class StackView : Node2D
 		_upOutline = GetNode<Polygon2D>("TileLayer/UpOutline");
 		_upFill = GetNode<Polygon2D>("TileLayer/UpFill");
 		_edgeSlots = GetNode<Node2D>("EdgeSlots");
+		_pathClipMask = new Polygon2D
+		{
+			Name = "GeneratedPathClipMask",
+			ZIndex = 6,
+			Color = Colors.White,
+			ClipChildren = ClipChildrenMode.Only,
+		};
+		AddChild(_pathClipMask);
+
 		_generatedPathLayer = new Node2D
 		{
 			Name = "GeneratedPathLayer",
-			ZIndex = 6,
 		};
+		_pathClipMask.AddChild(_generatedPathLayer);
 		_resourceLayer = new Node2D
 		{
 			Name = "GeneratedResourceLayer",
 			ZIndex = 8,
 		};
-		AddChild(_generatedPathLayer);
 		AddChild(_resourceLayer);
 
 		for (var edgeIndex = 0; edgeIndex < 6; edgeIndex++)
@@ -428,6 +437,7 @@ public partial class StackView : Node2D
 		_downFill.Polygon = BuildRegularHexPolygon(DownInnerSide, center);
 		_upOutline.Polygon = BuildRegularHexPolygon(UpOuterSide, center);
 		_upFill.Polygon = BuildRegularHexPolygon(UpInnerSide, center);
+		_pathClipMask.Polygon = BuildRegularHexPolygon(DownOuterSide, center);
 
 		if (ConflictHighlight)
 		{
@@ -548,9 +558,25 @@ public partial class StackView : Node2D
 
 	private Vector2[] BuildPathPolyline(int edgeIndex, int targetEdgeIndex, Vector2 center)
 	{
-		var start = GetEdgeAnchorPoint(edgeIndex, center, DownInnerSide, 0.88f);
-		var end = GetEdgeAnchorPoint(targetEdgeIndex, center, DownInnerSide, 0.88f);
-		return [start, center, end];
+		var start = GetPathEdgePoint(edgeIndex, center);
+		var end = GetPathEdgePoint(targetEdgeIndex, center);
+		var distance = GetShortestEdgeDistance(edgeIndex, targetEdgeIndex);
+
+		return distance switch
+		{
+			1 => BuildQuadraticPath(
+				start,
+				GetSharedCornerControl(edgeIndex, targetEdgeIndex, center),
+				end
+			),
+			2 => BuildQuadraticPath(
+				start,
+				GetDiagonalControl(edgeIndex, targetEdgeIndex, center),
+				end
+			),
+			3 => [start, end],
+			_ => [start, center, end],
+		};
 	}
 
 	private int? FindHoveredPathEdge(Vector2 localMousePosition)
@@ -568,10 +594,7 @@ public partial class StackView : Node2D
 			}
 
 			var points = BuildPathPolyline(edgeIndex, targetEdge.Value, center);
-			var distance = Mathf.Min(
-				GetDistanceToSegment(localMousePosition, points[0], points[1]),
-				GetDistanceToSegment(localMousePosition, points[1], points[2])
-			);
+			var distance = GetDistanceToPolyline(localMousePosition, points);
 
 			if (distance <= PathHoverDistance)
 			{
@@ -715,6 +738,73 @@ public partial class StackView : Node2D
 		return center + offset * insetFactor;
 	}
 
+	private Vector2 GetPathEdgePoint(int edgeIndex, Vector2 center)
+	{
+		return GetEdgeAnchorPoint(edgeIndex, center, DownOuterSide, 1.08f);
+	}
+
+	private Vector2 GetSharedCornerControl(int edgeA, int edgeB, Vector2 center)
+	{
+		var baseEdge = (edgeA + 1) % 6 == edgeB ? edgeA : edgeB;
+		var vertexIndex = (baseEdge + 5) % 6;
+		var vertex = GetHexVertexPoint(vertexIndex, center, DownOuterSide);
+		return center + (vertex - center) * 0.58f;
+	}
+
+	private Vector2 GetDiagonalControl(int edgeA, int edgeB, Vector2 center)
+	{
+		var clockwiseDistance = GetClockwiseEdgeDistance(edgeA, edgeB);
+		var middleEdge = clockwiseDistance == 2
+			? (edgeA + 1) % 6
+			: (edgeB + 1) % 6;
+
+		return GetEdgeAnchorPoint(middleEdge, center, DownOuterSide, 0.68f);
+	}
+
+	private static Vector2[] BuildQuadraticPath(Vector2 start, Vector2 control, Vector2 end)
+	{
+		const int segmentCount = 18;
+		var points = new Vector2[segmentCount + 1];
+		for (var i = 0; i <= segmentCount; i++)
+		{
+			var t = i / (float)segmentCount;
+			var oneMinusT = 1.0f - t;
+			points[i] =
+				oneMinusT * oneMinusT * start
+				+ 2.0f * oneMinusT * t * control
+				+ t * t * end;
+		}
+
+		return points;
+	}
+
+	private static int GetShortestEdgeDistance(int edgeA, int edgeB)
+	{
+		var clockwiseDistance = GetClockwiseEdgeDistance(edgeA, edgeB);
+		return Mathf.Min(clockwiseDistance, 6 - clockwiseDistance);
+	}
+
+	private static int GetClockwiseEdgeDistance(int edgeA, int edgeB)
+	{
+		return (edgeB - edgeA + 6) % 6;
+	}
+
+	private static Vector2 GetHexVertexPoint(int vertexIndex, Vector2 center, float sideLength)
+	{
+		var halfHeight = Mathf.Sqrt(3.0f) * sideLength * 0.5f;
+		var halfSide = sideLength * 0.5f;
+		return vertexIndex switch
+		{
+			0 => new Vector2(center.X + sideLength, center.Y),
+			1 => new Vector2(center.X + halfSide, center.Y + halfHeight),
+			2 => new Vector2(center.X - halfSide, center.Y + halfHeight),
+			3 => new Vector2(center.X - sideLength, center.Y),
+			4 => new Vector2(center.X - halfSide, center.Y - halfHeight),
+			5 => new Vector2(center.X + halfSide, center.Y - halfHeight),
+			_ => center,
+		};
+	}
+
 	private static float GetEdgeBaseRotation(int edgeIndex)
 	{
 		return edgeIndex switch
@@ -773,6 +863,27 @@ public partial class StackView : Node2D
 		var t = Mathf.Clamp((point - start).Dot(segment) / lengthSquared, 0.0f, 1.0f);
 		var projection = start + segment * t;
 		return point.DistanceTo(projection);
+	}
+
+	private static float GetDistanceToPolyline(Vector2 point, Vector2[] points)
+	{
+		if (points.Length == 0)
+		{
+			return float.PositiveInfinity;
+		}
+
+		if (points.Length == 1)
+		{
+			return point.DistanceTo(points[0]);
+		}
+
+		var closest = float.PositiveInfinity;
+		for (var i = 0; i < points.Length - 1; i++)
+		{
+			closest = Mathf.Min(closest, GetDistanceToSegment(point, points[i], points[i + 1]));
+		}
+
+		return closest;
 	}
 
 	private struct EdgeState

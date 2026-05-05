@@ -22,6 +22,7 @@
 [ext_resource type="PackedScene" uid="uid://bhdlqf462da0b" path="res://scenes/Envison Phase/StatusBanner.tscn" id="19_ftc2p"]
 [ext_resource type="Script" uid="uid://cxmu7y1wveyx6" path="res://scripts/Envision Phase/FeedbackTokenPopup.cs" id="19_roob6"]
 [ext_resource type="PackedScene" uid="uid://ba05ikbew35bn" path="res://scenes/Envison Phase/FeedbackTrackManipulationPopup.tscn" id="21_roob6"]
+[ext_resource type="Script" path="res://scripts/main/components/GameStartOverlayView.cs" id="22_start_overlay"]
 
 [node name="Main" type="Control" unique_id=786545785]
 layout_mode = 3
@@ -176,6 +177,17 @@ offset_left = -3.0
 offset_top = -10.999999
 offset_right = -635.6666
 offset_bottom = -1031.0
+
+[node name="GameStartOverlay" type="Control" parent="UIMain" unique_id=2113874430]
+z_index = 4090
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+script = ExtResource("22_start_overlay")
 
 [node name="ColorblindToggleButton" type="Button" parent="UIMain" unique_id=73986387]
 layout_mode = 0
