@@ -43,4 +43,4 @@ Entrance: `GET /state`, `POST /test/action`.
 3. `REST` mode is not a proactive push. Frontend use `/state` to demand a update and `/test/action` after every player action.
 4. Chat pannel now can accept `/dev activate` and `/dev deactivate` to change the game in/out developer mode. In this mode you can use `GET /state`, `POST /test/action {"phase":"ENVISION","playerId":0,"type":"pass"}` as in the server.
 5. A test command `/random simulation` is added into dev mode. It runs without the server but simulates the Json feedback and update frontend layouts with it.
-6. In dev mode, use `/test path random simulation` to get into path choosing and relations gain simulation. Use `/test path random generation` to randomly generate 11 hex-tiles from universe set of all hex-tiles.
+6. In dev mode, use `/test path random simulation` to get into path choosing and relations gain simulation. Use `/test path random generate` to randomly generate 11 hex-tiles from universe set of all hex-tiles.
