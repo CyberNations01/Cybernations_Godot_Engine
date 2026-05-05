@@ -300,10 +300,77 @@ public sealed class CybernationRestGameGateway : IGameGateway
 			var index = GetInt(tile, "position", tiles.Count);
 			var type = GetString(tile, "type", "Wild");
 			var (down, up) = ConvertServerStackType(type);
-			tiles.Add(new HiveBoardTilePayload(index, down, up, false, null));
+			tiles.Add(new HiveBoardTilePayload(index, down, up, false, BuildHiveBoardEdges(tile)));
 		}
 
 		return new HiveBoardStatePayload(tiles.ToArray());
+	}
+
+	private static HiveBoardEdgePayload[]? BuildHiveBoardEdges(JsonElement tile)
+	{
+		if (tile.TryGetProperty("edges", out var edgesElement) && edgesElement.ValueKind == JsonValueKind.Array)
+		{
+			var edges = new List<HiveBoardEdgePayload>();
+			foreach (var edge in edgesElement.EnumerateArray())
+			{
+				edges.Add(
+					new HiveBoardEdgePayload(
+						GetInt(edge, "edge", 0),
+						GetNullableString(edge, "relation_texture_path"),
+						GetString(edge, "path_kind", "none"),
+						GetInt(edge, "rotation_steps", 0),
+						GetNullableInt(edge, "path_target_edge"),
+						GetNullableString(edge, "path_texture_path"),
+						GetStringArray(edge, "resources")
+					)
+				);
+			}
+
+			return edges.ToArray();
+		}
+
+		if (!tile.TryGetProperty("paths", out var pathsElement) || pathsElement.ValueKind != JsonValueKind.Array)
+		{
+			return null;
+		}
+
+		var sides = tile.TryGetProperty("sides", out var sidesElement) && sidesElement.ValueKind == JsonValueKind.Array
+			? sidesElement
+			: default;
+		var generatedEdges = new List<HiveBoardEdgePayload>();
+		foreach (var path in pathsElement.EnumerateArray())
+		{
+			if (path.ValueKind != JsonValueKind.Array || path.GetArrayLength() < 2)
+			{
+				continue;
+			}
+
+			var edgeA = path[0].GetInt32();
+			var edgeB = path[1].GetInt32();
+			var pathKind = ClassifyPathKind(edgeA, edgeB);
+			generatedEdges.Add(BuildGeneratedEdgePayload(edgeA, edgeB, pathKind, sides));
+			generatedEdges.Add(BuildGeneratedEdgePayload(edgeB, edgeA, pathKind, sides));
+		}
+
+		return generatedEdges.ToArray();
+	}
+
+	private static HiveBoardEdgePayload BuildGeneratedEdgePayload(
+		int edge,
+		int targetEdge,
+		string pathKind,
+		JsonElement sides
+	)
+	{
+		return new HiveBoardEdgePayload(
+			edge,
+			null,
+			pathKind,
+			0,
+			targetEdge,
+			null,
+			GetResourcesForSide(sides, edge)
+		);
 	}
 
 	private static EnvisionStatePayload BuildEnvisionState(
@@ -666,8 +733,14 @@ public sealed class CybernationRestGameGateway : IGameGateway
 	private static bool IsRandomSimulationCommand(string command)
 	{
 		var normalized = command.Trim();
-		return normalized.Equals("/random simulation", StringComparison.OrdinalIgnoreCase);
+		return normalized.Equals("/random simulation", StringComparison.OrdinalIgnoreCase)
+			|| normalized.Equals("/test path random simulation", StringComparison.OrdinalIgnoreCase)
+			|| normalized.Equals("/test path random generate", StringComparison.OrdinalIgnoreCase);
 	}
+
+	private const string BackendStackCatalogJson = """
+[{"id":1,"type":"Wild","sides":[[],[],["HR","HR"],[],[],["HR","HR","HR"]],"paths":[[5,3],[2,1],[0,4]]},{"id":2,"type":"Wild","sides":[["Env"],["Env","HR"],["Env"],["HR","HR"],["HR","HR"],["Env","Env"]],"paths":[[2,4],[1,5],[3,0]]},{"id":3,"type":"Wild","sides":[["Env","Env"],["Env","Env"],[],["Env"],[],["Tech"]],"paths":[[0,1],[4,5],[2,3]]},{"id":4,"type":"Wild","sides":[["HR"],["Env"],[],["Env"],["HR"],["HR","Tech","Env"]],"paths":[[5,4],[3,0],[2,1]]},{"id":5,"type":"Wild","sides":[["HR","HR"],["HR","Env"],["HR","HR","Env"],["Env","HR"],["HR","Tech","HR"],["HR","HR","HR"]],"paths":[[4,0],[2,3],[1,5]]},{"id":6,"type":"Wild","sides":[["HR","Tech","Env"],[],[],["Env","HR"],["Env","Env"],["Tech","Env"]],"paths":[[1,5],[3,2],[0,4]]},{"id":7,"type":"Wild","sides":[["HR"],["Env"],[],["Env","HR"],["Tech","Env"],["HR","HR"]],"paths":[[3,1],[2,5],[0,4]]},{"id":8,"type":"Wild","sides":[[],["HR"],["Tech","HR","Env"],["Tech","Tech","Env"],["Env"],["Tech","Env","Env"]],"paths":[[1,2],[5,0],[3,4]]},{"id":9,"type":"Wild","sides":[[],["HR","Env"],["HR"],[],["HR"],[]],"paths":[[4,5],[3,1],[0,2]]},{"id":10,"type":"Wild","sides":[["Env"],["HR","Env","HR"],[],[],["HR","HR","Tech"],[]],"paths":[[3,2],[1,4],[0,5]]},{"id":11,"type":"Wild","sides":[[],["HR"],["HR","HR","Env"],[],["Env","Env","HR"],[]],"paths":[[5,2],[3,4],[1,0]]},{"id":12,"type":"Waste","sides":[["-Co"],["-Co"],[],["-Co"],["-Co"],["-Co"]],"paths":[[1,2],[0,5],[4,3]]},{"id":13,"type":"Waste","sides":[["-Co"],[],["Env","-Co"],["-Co","-Co"],[],["HR","Env"]],"paths":[[5,3],[2,0],[1,4]]},{"id":14,"type":"Waste","sides":[[],[],["-Co","-Co"],["-Co"],["-Co","Env"],["-Co","Env"]],"paths":[[4,5],[1,2],[3,0]]},{"id":15,"type":"Waste","sides":[["-Co","-Co"],["HR"],[],["-Co","HR"],["-Co"],[]],"paths":[[1,2],[5,0],[4,3]]},{"id":16,"type":"Waste","sides":[["-Co","-Co"],["-Co"],[],["-Co"],[],["Env"]],"paths":[[3,1],[4,0],[2,5]]},{"id":17,"type":"Waste","sides":[["-Co","-Co"],["-Co"],[],["Env","-Co"],["-Co"],["-Co","-Co"]],"paths":[[4,0],[5,3],[2,1]]},{"id":18,"type":"Waste","sides":[[],["HR","-Co"],[],[],["-Co"],["-Co","-Co"]],"paths":[[1,0],[2,4],[3,5]]},{"id":19,"type":"Waste","sides":[[],[],["-Co","Env"],[],["Env"],["-Co","HR"]],"paths":[[3,4],[5,2],[0,1]]},{"id":20,"type":"Waste","sides":[["-Co"],["-Co","-Co"],["Env"],["Env"],["-Co","-Co"],[]],"paths":[[2,5],[4,0],[3,1]]},{"id":21,"type":"Waste","sides":[["-Co"],["-Co"],["-Co","HR"],[],["-Co"],[]],"paths":[[1,5],[0,4],[2,3]]},{"id":22,"type":"Waste","sides":[[],["-Co","HR"],["-Co"],[],["-Co"],["Env","HR"]],"paths":[[1,3],[0,2],[4,5]]},{"id":23,"type":"DevA","sides":[["Env","Tech"],["HR","HR"],["Env","Env"],[],["Tech","Env","HR"],["HR","Tech","HR"]],"paths":[[3,0],[4,2],[1,5]]},{"id":24,"type":"DevA","sides":[["HR","HR"],[],["HR","Env"],["Tech","Env"],["Env"],["Env","Tech","HR"]],"paths":[[4,5],[1,0],[3,2]]},{"id":25,"type":"DevA","sides":[["Tech"],["Tech","Tech"],["HR"],["HR"],["HR","HR"],["HR","Tech"]],"paths":[[3,4],[0,5],[2,1]]},{"id":26,"type":"DevA","sides":[[],[],["Tech"],[],["Tech","HR","Env"],["Tech","Env","HR"]],"paths":[[1,2],[4,3],[5,0]]},{"id":27,"type":"DevA","sides":[["HR","Env","Tech"],["HR","Tech","HR"],["Tech","Tech"],["Env","HR","Tech"],["Tech","Env","Tech"],["Env","HR"]],"paths":[[3,0],[4,2],[1,5]]},{"id":28,"type":"DevA","sides":[["Env","Tech"],[],["HR"],["Env","Env","HR"],["Env","Tech","HR"],["Tech","Env","Tech"]],"paths":[[2,5],[1,3],[4,0]]},{"id":29,"type":"DevA","sides":[["Env","Tech"],["HR","Env","Env"],["Tech"],["Tech","HR"],["Env","Env"],["Tech"]],"paths":[[2,3],[5,0],[4,1]]},{"id":30,"type":"DevA","sides":[[],["HR","Tech","HR"],["Env","Tech","Tech"],["Env","Tech","Tech"],[],["HR","HR","Tech"]],"paths":[[4,3],[5,0],[1,2]]},{"id":31,"type":"DevA","sides":[[],["Env"],[],["Env"],["Env","HR","Env"],["Env","Env"]],"paths":[[2,5],[3,1],[0,4]]},{"id":32,"type":"DevA","sides":[[],["HR","Tech"],["Tech","Env","HR"],["HR"],["Tech","HR"],[]],"paths":[[5,1],[3,2],[0,4]]},{"id":33,"type":"DevA","sides":[["HR","HR"],[],["Env","HR","Tech"],["Env","Tech","Env"],["HR","Tech"],["Tech","Env","HR"]],"paths":[[3,5],[4,0],[1,2]]},{"id":34,"type":"DevB","sides":[["HR"],["Tech","Tech","Tech"],["Tech","HR","Tech"],["Tech","Tech"],["Tech"],["Tech","HR","HR"]],"paths":[[1,2],[0,4],[3,5]]},{"id":35,"type":"DevB","sides":[["Tech","HR"],["Tech","Tech"],["Tech","HR"],["Tech","Tech"],["Tech","Tech"],["Tech"]],"paths":[[3,2],[0,1],[4,5]]},{"id":36,"type":"DevB","sides":[["Tech","Tech","HR"],["Env","HR"],["Tech","Tech"],[],["Tech"],[]],"paths":[[0,3],[5,1],[2,4]]},{"id":37,"type":"DevB","sides":[[],[],["Tech","Tech"],["Env"],["Env","Tech"],[]],"paths":[[1,4],[2,0],[5,3]]},{"id":38,"type":"DevB","sides":[["Tech"],["Tech","Tech"],["Tech","HR","Tech"],["Tech","Tech","Env"],["Tech","Tech","Tech"],[]],"paths":[[4,0],[3,2],[5,1]]},{"id":39,"type":"DevB","sides":[["Tech"],[],["Tech"],["HR","Tech","Tech"],["HR","HR"],["Tech","Tech","Tech"]],"paths":[[2,0],[3,1],[4,5]]},{"id":40,"type":"DevB","sides":[["Tech"],["HR","Tech"],["HR"],["Tech","Tech"],["HR","Env"],["Tech","Tech","Env"]],"paths":[[1,3],[0,4],[2,5]]},{"id":41,"type":"DevB","sides":[["Env"],[],["Tech","HR"],["Tech"],["Env","Tech","Tech"],["Env","Tech","Tech"]],"paths":[[4,5],[3,1],[0,2]]},{"id":42,"type":"DevB","sides":[["Tech","Env","HR"],[],["Tech","Tech","Tech"],["Env","HR","Tech"],["Tech","Tech","Tech"],["Tech","HR","Tech"]],"paths":[[0,3],[5,2],[1,4]]},{"id":43,"type":"DevB","sides":[[],[],["HR"],["Tech","Tech"],[],["Env"]],"paths":[[1,4],[2,5],[3,0]]},{"id":44,"type":"DevB","sides":[["Env","Tech","HR"],["Env","Env","Tech"],["Tech"],["Env"],["HR","Env"],["Env","Tech"]],"paths":[[5,1],[3,4],[2,0]]}]
+""";
 
 	private static string BuildRandomSimulationServerJson()
 	{
@@ -697,14 +770,22 @@ public sealed class CybernationRestGameGateway : IGameGateway
 			});
 		}
 
-		var stackTypes = new[] { "Wild", "Wild", "Wild", "Waste", "DevA", "DevB" };
+		var availableStacks = new List<BackendStackTemplate>(GetBackendStackCatalog());
 		var board = new List<object>(11);
 		for (var position = 0; position < 11; position++)
 		{
+			var stackIndex = random.Next(0, availableStacks.Count);
+			var stack = availableStacks[stackIndex];
+			availableStacks.RemoveAt(stackIndex);
+
 			board.Add(new
 			{
 				position,
-				type = stackTypes[random.Next(0, stackTypes.Length)],
+				stackId = stack.id,
+				type = stack.type,
+				sides = stack.sides,
+				paths = stack.paths,
+				edges = BuildStackEdgeObjects(stack),
 			});
 		}
 
@@ -776,6 +857,51 @@ public sealed class CybernationRestGameGateway : IGameGateway
 		{
 			WriteIndented = true,
 		});
+	}
+
+	private static BackendStackTemplate[] GetBackendStackCatalog()
+	{
+		return JsonSerializer.Deserialize<BackendStackTemplate[]>(BackendStackCatalogJson, JsonOptions)
+			?? Array.Empty<BackendStackTemplate>();
+	}
+
+	private static object[] BuildStackEdgeObjects(BackendStackTemplate stack)
+	{
+		var edges = new List<object>();
+		foreach (var path in stack.paths)
+		{
+			if (path.Length < 2)
+			{
+				continue;
+			}
+
+			var edgeA = path[0];
+			var edgeB = path[1];
+			var pathKind = ClassifyPathKind(edgeA, edgeB);
+			edges.Add(BuildStackEdgeObject(stack, edgeA, edgeB, pathKind));
+			edges.Add(BuildStackEdgeObject(stack, edgeB, edgeA, pathKind));
+		}
+
+		return edges.ToArray();
+	}
+
+	private static object BuildStackEdgeObject(
+		BackendStackTemplate stack,
+		int edge,
+		int targetEdge,
+		string pathKind
+	)
+	{
+		return new
+		{
+			edge,
+			relation_texture_path = (string?)null,
+			path_kind = pathKind,
+			rotation_steps = 0,
+			path_target_edge = targetEdge,
+			path_texture_path = (string?)null,
+			resources = edge >= 0 && edge < stack.sides.Length ? stack.sides[edge] : [],
+		};
 	}
 
 	private static string PrettyPrintJsonIfPossible(string body)
@@ -914,11 +1040,82 @@ public sealed class CybernationRestGameGateway : IGameGateway
 			: fallback;
 	}
 
+	private static string? GetNullableString(JsonElement element, string property)
+	{
+		return element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String
+			? value.GetString()
+			: null;
+	}
+
 	private static int GetInt(JsonElement element, string property, int fallback)
 	{
 		return element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.Number
 			? value.GetInt32()
 			: fallback;
+	}
+
+	private static int? GetNullableInt(JsonElement element, string property)
+	{
+		return element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.Number
+			? value.GetInt32()
+			: null;
+	}
+
+	private static string[]? GetStringArray(JsonElement element, string property)
+	{
+		if (!element.TryGetProperty(property, out var value) || value.ValueKind != JsonValueKind.Array)
+		{
+			return null;
+		}
+
+		var strings = new List<string>();
+		foreach (var item in value.EnumerateArray())
+		{
+			if (item.ValueKind == JsonValueKind.String)
+			{
+				strings.Add(item.GetString() ?? "");
+			}
+		}
+
+		return strings.ToArray();
+	}
+
+	private static string[] GetResourcesForSide(JsonElement sides, int edge)
+	{
+		if (sides.ValueKind != JsonValueKind.Array || edge < 0 || edge >= sides.GetArrayLength())
+		{
+			return [];
+		}
+
+		var side = sides[edge];
+		if (side.ValueKind != JsonValueKind.Array)
+		{
+			return [];
+		}
+
+		var resources = new List<string>();
+		foreach (var resource in side.EnumerateArray())
+		{
+			if (resource.ValueKind == JsonValueKind.String)
+			{
+				resources.Add(resource.GetString() ?? "");
+			}
+		}
+
+		return resources.ToArray();
+	}
+
+	private static string ClassifyPathKind(int edgeA, int edgeB)
+	{
+		var clockwiseDistance = Math.Abs(edgeA - edgeB) % 6;
+		var distance = Math.Min(clockwiseDistance, 6 - clockwiseDistance);
+		return distance switch
+		{
+			3 => "type_a",
+			2 => "type_c",
+			1 => "type_b",
+			_ => "type_d",
+		};
 	}
 
 	private static int GetIntAny(JsonElement element, int fallback, params string[] properties)
@@ -993,6 +1190,14 @@ public sealed class CybernationRestGameGateway : IGameGateway
 
 		value = default;
 		return false;
+	}
+
+	private sealed class BackendStackTemplate
+	{
+		public int id { get; set; }
+		public string type { get; set; } = "Wild";
+		public string[][] sides { get; set; } = [];
+		public int[][] paths { get; set; } = [];
 	}
 
 }

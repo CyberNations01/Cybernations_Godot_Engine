@@ -36,7 +36,9 @@ public readonly record struct HiveBoardEdgePayload(
     string? relation_texture_path,
     string path_kind,
     int rotation_steps,
-    string? path_texture_path
+    int? path_target_edge,
+    string? path_texture_path,
+    string[]? resources = null
 );
 
 public readonly record struct HiveBoardTilePayload(

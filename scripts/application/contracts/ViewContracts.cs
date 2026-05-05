@@ -24,12 +24,22 @@ public enum BoardPathKind
 	TypeE,
 }
 
+public enum BoardResourceKind
+{
+	Human,
+	Technology,
+	Environment,
+	Conflict,
+}
+
 public readonly record struct BoardEdgeVm(
 	int EdgeIndex,
 	string? RelationTexturePath,
 	BoardPathKind PathKind,
 	int RotationSteps,
-	string? PathTexturePath
+	int? PathTargetEdge,
+	string? PathTexturePath,
+	IReadOnlyList<BoardResourceKind>? Resources
 );
 
 public readonly record struct BoardTileVm(
@@ -44,6 +54,20 @@ public readonly record struct PlayerPanelPlayerVm(
 	int Slot,
 	string Progress,
 	bool IsPassing
+);
+
+public readonly record struct BoardPathResourceTotalsVm(
+	int Human,
+	int Technology,
+	int Environment,
+	int Conflict
+);
+
+public readonly record struct BoardPathHoverVm(
+	int ComponentId,
+	int TileIndex,
+	int EdgeIndex,
+	BoardPathResourceTotalsVm Resources
 );
 
 public interface IPopupHostAwareView
@@ -85,7 +109,10 @@ public interface IInfoSummaryPanelView : IPopupHostAwareView
 
 public interface IHiveBoardView
 {
+	event Action<BoardPathHoverVm?> PathHovered;
+
 	void ApplyTiles(IReadOnlyList<BoardTileVm> tiles);
+	void SetPathSelectionEnabled(bool enabled);
 }
 
 public interface IResourceTracksView

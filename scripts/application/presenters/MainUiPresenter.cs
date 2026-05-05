@@ -26,6 +26,12 @@ public sealed class MainUiPresenter : IDisposable
 	private InfoSummaryStatePayload? _cachedInfoSummaryState;
 	private bool _isBound;
 	private bool _developerMode;
+	private bool _pathSelectionMode;
+	private InfoSummaryStatePayload? _pathSelectionPreviousSummary;
+	private int _currentHuman;
+	private int _currentTechnology;
+	private int _currentEnvironment;
+	private int _currentConflict;
 	private readonly EnvisionController _envisionController;
 
 	public MainUiPresenter(
@@ -73,6 +79,7 @@ public sealed class MainUiPresenter : IDisposable
 
 		_playerDetailPopupView.CloseRequested += OnPlayerDetailCloseRequested;
 		_gateway.ServerPacketReceived += OnServerPacketReceived;
+		_hiveBoardView.PathHovered += OnBoardPathHovered;
 
 		_chatPanelView.SetExpanded(false);
 		_teamGoalPanelView.SetDropdownVisible(false);
@@ -130,6 +137,7 @@ public sealed class MainUiPresenter : IDisposable
 
 		_playerDetailPopupView.CloseRequested -= OnPlayerDetailCloseRequested;
 		_gateway.ServerPacketReceived -= OnServerPacketReceived;
+		_hiveBoardView.PathHovered -= OnBoardPathHovered;
 		_isBound = false;
 	}
 
@@ -338,7 +346,10 @@ public sealed class MainUiPresenter : IDisposable
 		{
 			var infoSummary = payload.info_summary.Value;
 			_cachedInfoSummaryState = infoSummary;
-			_infoSummaryPanelView.SetSummary(infoSummary.title, infoSummary.body);
+			if (!_pathSelectionMode)
+			{
+				_infoSummaryPanelView.SetSummary(infoSummary.title, infoSummary.body);
+			}
 		}
 
 		if (payload.hive_board.HasValue)
@@ -403,7 +414,10 @@ public sealed class MainUiPresenter : IDisposable
 		}
 
 		_cachedInfoSummaryState = payload;
-		_infoSummaryPanelView.SetSummary(payload.title, payload.body);
+		if (!_pathSelectionMode)
+		{
+			_infoSummaryPanelView.SetSummary(payload.title, payload.body);
+		}
 		if (_infoSummaryDetailOpenPending)
 		{
 			_infoSummaryPanelView.SetDropdownVisible(true);
@@ -452,6 +466,10 @@ public sealed class MainUiPresenter : IDisposable
 		{
 			var resourceIndex = FindPlayerIndex(players, payload.current_player_id);
 			var resourcePlayer = players[resourceIndex];
+			_currentHuman = resourcePlayer.People;
+			_currentTechnology = resourcePlayer.Technology;
+			_currentEnvironment = resourcePlayer.Environment;
+			_currentConflict = payload.conflict;
 			_resourceTracksView.SetResources(
 				resourcePlayer.People,
 				resourcePlayer.Technology,
@@ -560,7 +578,9 @@ public sealed class MainUiPresenter : IDisposable
 							edgePayload.relation_texture_path,
 							ParseBoardPathKind(edgePayload.path_kind),
 							edgePayload.rotation_steps,
-							edgePayload.path_texture_path
+							edgePayload.path_target_edge,
+							edgePayload.path_texture_path,
+							ParseBoardResources(edgePayload.resources)
 						)
 					);
 				}
@@ -580,6 +600,61 @@ public sealed class MainUiPresenter : IDisposable
 		}
 
 		_hiveBoardView.ApplyTiles(tiles);
+	}
+
+	private static BoardResourceKind[] ParseBoardResources(string[]? resources)
+	{
+		if (resources == null || resources.Length == 0)
+		{
+			return [];
+		}
+
+		var parsed = new List<BoardResourceKind>(resources.Length);
+		foreach (var resource in resources)
+		{
+			if (TryParseBoardResourceKind(resource, out var kind))
+			{
+				parsed.Add(kind);
+			}
+		}
+
+		return parsed.ToArray();
+	}
+
+	private static bool TryParseBoardResourceKind(string? value, out BoardResourceKind kind)
+	{
+		if (string.IsNullOrWhiteSpace(value))
+		{
+			kind = BoardResourceKind.Human;
+			return false;
+		}
+
+		var normalized = value.Trim().ToLowerInvariant().Replace("_", string.Empty).Replace("-", string.Empty);
+		switch (normalized)
+		{
+			case "hr":
+			case "human":
+			case "humanrelation":
+			case "people":
+				kind = BoardResourceKind.Human;
+				return true;
+			case "tech":
+			case "technology":
+				kind = BoardResourceKind.Technology;
+				return true;
+			case "env":
+			case "environment":
+				kind = BoardResourceKind.Environment;
+				return true;
+			case "co":
+			case "conflict":
+			case "minusco":
+				kind = BoardResourceKind.Conflict;
+				return true;
+			default:
+				kind = BoardResourceKind.Human;
+				return false;
+		}
 	}
 
 	private static bool TryParseBoardTileKind(string? value, out BoardTileKind kind)
@@ -653,7 +728,7 @@ public sealed class MainUiPresenter : IDisposable
 			_chatPanelView.AddMessage(
 				new ChatMessageVm(
 					"DEV",
-					"Developer mode activated. Enter REST commands like GET /state, or /random simulation for local fake server JSON. Use /dev deactivate to exit."
+					"Developer mode activated. Enter REST commands like GET /state, /random simulation, or /test path random simulation. Use /dev deactivate to exit."
 				)
 			);
 			return true;
@@ -662,6 +737,7 @@ public sealed class MainUiPresenter : IDisposable
 		if (command.Equals("/dev deactivate", StringComparison.OrdinalIgnoreCase))
 		{
 			_developerMode = false;
+			ExitPathSelectionMode();
 			_chatPanelView.AddMessage(new ChatMessageVm("DEV", "Developer mode deactivated."));
 			return true;
 		}
@@ -669,6 +745,11 @@ public sealed class MainUiPresenter : IDisposable
 		if (!_developerMode)
 		{
 			return false;
+		}
+
+		if (IsPathRandomCommand(command))
+		{
+			EnterPathSelectionMode();
 		}
 
 		_chatPanelView.AddMessage(new ChatMessageVm("DEV>", command));
@@ -681,6 +762,90 @@ public sealed class MainUiPresenter : IDisposable
 			)
 		);
 		return true;
+	}
+
+	private static bool IsPathRandomCommand(string command)
+	{
+		return command.Equals("/test path random simulation", StringComparison.OrdinalIgnoreCase)
+			|| command.Equals("/test path random generate", StringComparison.OrdinalIgnoreCase);
+	}
+
+	private void EnterPathSelectionMode()
+	{
+		if (!_pathSelectionMode)
+		{
+			_pathSelectionPreviousSummary = _cachedInfoSummaryState;
+		}
+
+		_pathSelectionMode = true;
+		_hiveBoardView.SetPathSelectionEnabled(true);
+		SetPathSelectionInstructionSummary();
+	}
+
+	private void ExitPathSelectionMode()
+	{
+		if (!_pathSelectionMode)
+		{
+			return;
+		}
+
+		_pathSelectionMode = false;
+		_hiveBoardView.SetPathSelectionEnabled(false);
+		var summary = _pathSelectionPreviousSummary ?? _cachedInfoSummaryState;
+		if (summary.HasValue)
+		{
+			_infoSummaryPanelView.SetSummary(summary.Value.title, summary.Value.body);
+		}
+
+		_pathSelectionPreviousSummary = null;
+	}
+
+	private void OnBoardPathHovered(BoardPathHoverVm? hover)
+	{
+		if (!_pathSelectionMode)
+		{
+			return;
+		}
+
+		if (!hover.HasValue)
+		{
+			SetPathSelectionInstructionSummary();
+			return;
+		}
+
+		var value = hover.Value;
+		var resources = value.Resources;
+		var nextConflict = Math.Max(0, _currentConflict + resources.Conflict);
+		var resourceCap = Math.Max(0, 25 - nextConflict);
+		var nextHuman = Math.Clamp(_currentHuman + resources.Human, 0, resourceCap);
+		var nextTechnology = Math.Clamp(_currentTechnology + resources.Technology, 0, resourceCap);
+		var nextEnvironment = Math.Clamp(_currentEnvironment + resources.Environment, 0, resourceCap);
+
+		_infoSummaryPanelView.SetSummary(
+			"Path Selection",
+			$"Connected path #{value.ComponentId}\n" +
+			$"Hovered edge: Tile {value.TileIndex}, Edge {value.EdgeIndex}\n\n" +
+			$"Gain from this connected path:\n" +
+			$"Human: +{resources.Human}\n" +
+			$"Tech: +{resources.Technology}\n" +
+			$"Environment: +{resources.Environment}\n" +
+			$"Conflict: +{resources.Conflict}\n\n" +
+			$"After gain:\n" +
+			$"Human: {nextHuman}/{resourceCap}\n" +
+			$"Tech: {nextTechnology}/{resourceCap}\n" +
+			$"Environment: {nextEnvironment}/{resourceCap}\n" +
+			$"Conflict: {nextConflict}"
+		);
+	}
+
+	private void SetPathSelectionInstructionSummary()
+	{
+		_infoSummaryPanelView.SetSummary(
+			"Path Selection",
+			"Hover over a connected path on the board.\n\n" +
+			"The panel will show resources gained from that connected path and the resulting resource track values.\n\n" +
+			"Use /test path random generate to draw 11 new stacks from the backend stack catalog."
+		);
 	}
 
 	private void ApplyDevConsoleResult(in PacketEnvelope envelope)
