@@ -15,3 +15,19 @@ Entrance: `GET /state`, `POST /test/action`.
 4. Chat pannel now can accept `/dev activate` and `/dev deactivate` to change the game in/out developer mode. In this mode you can use `GET /state`, `POST /test/action {"phase":"ENVISION","playerId":0,"type":"pass"}` as in the server.
 5. A test command `/random simulation` is added into dev mode. It runs without the server but simulates the Json feedback and update frontend layouts with it.
 6. In dev mode, use `/test path random simulation` to get into path choosing and relations gain simulation. Use `/test path random generate` to randomly generate 11 hex-tiles from universe set of all hex-tiles.
+
+
+# [2026/5/5 UPDATE 2]
+
+## Fix
+1. All previous defects.
+2. Defalt REST to `http://127.0.0.1:8081` -> `room-server` in `ServerForTest`.
+
+## Usage
+Use 
+
+`cd ServerForTest`
+
+`./out/room-server`
+
+run server before initialize the game.

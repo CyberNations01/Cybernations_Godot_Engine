@@ -145,3 +145,12 @@ public interface IPlayerDetailPopupView
 	void ShowPlayerDetail(PlayerDetailVm detail, Vector2 preferredPosition);
 	void HidePopup();
 }
+
+public interface IGameStartOverlayView
+{
+	event Action? StartRequested;
+
+	bool IsOverlayVisible { get; }
+	void SetOverlayVisible(bool visible);
+	void SetStatus(string message, bool busy);
+}

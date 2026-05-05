@@ -27,6 +27,16 @@ public readonly record struct DevConsoleResultPayload(
     string body
 );
 
+public readonly record struct GameStartRequestPayload();
+
+public readonly record struct GameStartStatePayload(
+    bool started,
+    int player_id,
+    string session_id,
+    string room_state,
+    string status_message
+);
+
 public readonly record struct TeamGoalStatePayload(string title, string description);
 
 public readonly record struct InfoSummaryStatePayload(string title, string body);
