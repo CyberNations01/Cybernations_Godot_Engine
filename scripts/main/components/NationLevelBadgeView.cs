@@ -1,9 +1,10 @@
 using Godot;
 
-public partial class NationLevelBadgeView : Control
+public partial class NationLevelBadgeView : Control, INationLevelBadgeView
 {
 	private readonly Color _inkColor = Color.FromHtml("#2B2726");
 	private readonly Color _fillColor = Color.FromHtml("#F0B54B");
+	private Label _valueLabel = null!;
 
 	[Export]
 	public string LevelText { get; set; } = "10";
@@ -24,15 +25,29 @@ public partial class NationLevelBadgeView : Control
 		fill.Polygon = BuildShieldPolygon(new Vector2(102, 130), new Vector2(5, 5));
 		AddChild(fill);
 
-		var value = new Label();
-		value.Text = LevelText;
-		value.Position = new Vector2(6, 18);
-		value.Size = new Vector2(100, 64);
-		value.HorizontalAlignment = HorizontalAlignment.Center;
-		value.VerticalAlignment = VerticalAlignment.Center;
-		value.AddThemeFontSizeOverride("font_size", 58);
-		value.AddThemeColorOverride("font_color", Colors.Black);
-		AddChild(value);
+		_valueLabel = new Label();
+		_valueLabel.Position = new Vector2(6, 18);
+		_valueLabel.Size = new Vector2(100, 64);
+		_valueLabel.HorizontalAlignment = HorizontalAlignment.Center;
+		_valueLabel.VerticalAlignment = VerticalAlignment.Center;
+		_valueLabel.AddThemeFontSizeOverride("font_size", 58);
+		_valueLabel.AddThemeColorOverride("font_color", Colors.Black);
+		AddChild(_valueLabel);
+		ApplyLevelText();
+	}
+
+	public void SetLevel(int level)
+	{
+		LevelText = Mathf.Max(0, level).ToString();
+		if (IsNodeReady())
+		{
+			ApplyLevelText();
+		}
+	}
+
+	private void ApplyLevelText()
+	{
+		_valueLabel.Text = LevelText;
 	}
 
 	private static Vector2[] BuildShieldPolygon(Vector2 size, Vector2 offset)

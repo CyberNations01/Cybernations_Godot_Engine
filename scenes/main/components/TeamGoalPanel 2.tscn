@@ -1,0 +1,53 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/main/components/TeamGoalPanelView.cs" id="1_script"]
+
+[node name="TeamGoalPanel" type="Control"]
+script = ExtResource("1_script")
+
+[node name="PreviewPanel" type="Panel" parent="."]
+offset_right = 500.0
+offset_bottom = 232.0
+clip_contents = true
+
+[node name="Layout" type="VBoxContainer" parent="PreviewPanel"]
+offset_left = 18.0
+offset_top = 14.0
+offset_right = 482.0
+offset_bottom = 204.0
+theme_override_constants/separation = 10
+clip_contents = true
+
+[node name="TitleLabel" type="Label" parent="PreviewPanel/Layout"]
+custom_minimum_size = Vector2(0, 30)
+theme_override_font_sizes/font_size = 22
+text = "Team Goal"
+
+[node name="BodyLabel" type="Label" parent="PreviewPanel/Layout"]
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 14
+autowrap_mode = 3
+
+[node name="PreviewHitArea" type="Button" parent="."]
+offset_right = 500.0
+offset_bottom = 232.0
+focus_mode = 0
+mouse_default_cursor_shape = 2
+flat = true
+text = ""
+modulate = Color(1, 1, 1, 0)
+
+[node name="DropdownPanel" type="Panel" parent="."]
+visible = false
+offset_left = -260.0
+offset_right = 500.0
+offset_bottom = 900.0
+clip_contents = false
+
+[node name="Sections" type="VBoxContainer" parent="DropdownPanel"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 14

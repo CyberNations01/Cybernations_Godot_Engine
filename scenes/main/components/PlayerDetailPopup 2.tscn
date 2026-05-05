@@ -1,0 +1,46 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/main/components/PlayerDetailPopupView.cs" id="1_script"]
+
+[node name="PlayerDetailPopup" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="PopupPanel" type="Panel" parent="."]
+visible = false
+offset_right = 650.0
+offset_bottom = 400.0
+clip_contents = true
+
+[node name="Layout" type="VBoxContainer" parent="PopupPanel"]
+offset_left = 24.0
+offset_top = 20.0
+offset_right = 626.0
+offset_bottom = 376.0
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="PopupPanel/Layout"]
+custom_minimum_size = Vector2(0, 36)
+theme_override_font_sizes/font_size = 30
+text = "Player detail"
+
+[node name="BodyLabel" type="Label" parent="PopupPanel/Layout"]
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 20
+autowrap_mode = 3
+
+[node name="CloseButton" type="Button" parent="PopupPanel"]
+offset_left = 600.0
+offset_top = 14.0
+offset_right = 636.0
+offset_bottom = 46.0
+focus_mode = 0
+mouse_default_cursor_shape = 2
+theme_override_font_sizes/font_size = 28
+flat = true
+text = "x"

@@ -116,6 +116,12 @@ public partial class ChatPanelView : Control, IChatPanelView
 		RefreshChatLogDisplay();
 	}
 
+	public void AddMessage(ChatMessageVm message)
+	{
+		_chatMessages.Add($"[{message.Sender}] {message.Content}");
+		RefreshChatLogDisplay();
+	}
+
 	public override void _Input(InputEvent @event)
 	{
 		if (!_isExpanded)

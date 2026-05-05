@@ -1,12 +1,13 @@
+using System;
 using Godot;
 
-public partial class TurnDotsView : Control
+public partial class TurnDotsView : Control, ITurnDotsView
 {
 	private const int TotalTurns = 6;
 
 	private readonly Color _inkColor = Color.FromHtml("#2B2726");
-	private readonly Color _inactiveColor = Color.FromHtml("#ECEAE7");
-	private readonly Color _activeColor = Color.FromHtml("#3D29ED");
+	private readonly Color _completedColor = Color.FromHtml("#2B2726");
+	private readonly Color _pendingColor = Color.FromHtml("#F7D978");
 
 	[Export]
 	public int CompletedTurns { get; set; }
@@ -16,6 +17,25 @@ public partial class TurnDotsView : Control
 		MouseFilter = MouseFilterEnum.Ignore;
 		Size = new Vector2(150, 98);
 		CustomMinimumSize = Size;
+		Refresh();
+	}
+
+	public void SetCompletedTurns(int completedTurns)
+	{
+		CompletedTurns = Math.Clamp(completedTurns, 0, TotalTurns);
+		if (IsNodeReady())
+		{
+			Refresh();
+		}
+	}
+
+	private void Refresh()
+	{
+		foreach (Node child in GetChildren())
+		{
+			RemoveChild(child);
+			child.QueueFree();
+		}
 
 		var dotSize = new Vector2(38, 38);
 		const float gapX = 48.0f;
@@ -25,7 +45,7 @@ public partial class TurnDotsView : Control
 		{
 			var row = index / 3;
 			var col = index % 3;
-			var fill = index < CompletedTurns ? _activeColor : _inactiveColor;
+			var fill = index < CompletedTurns ? _completedColor : _pendingColor;
 			AddChild(CreateRoundPanel(new Vector2(gapX * col, gapY * row), dotSize, fill, 19, _inkColor, 2));
 		}
 	}

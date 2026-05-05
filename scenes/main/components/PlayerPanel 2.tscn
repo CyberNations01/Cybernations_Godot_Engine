@@ -1,0 +1,44 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/main/components/PlayerPanelView.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://scenes/players/Player.tscn" id="2_player"]
+
+[node name="PlayerPanel" type="Control"]
+offset_right = 180.0
+offset_bottom = 760.0
+script = ExtResource("1_script")
+
+[node name="PlayersVBox" type="VBoxContainer" parent="."]
+offset_right = 180.0
+offset_bottom = 760.0
+theme_override_constants/separation = 28
+
+[node name="P1" parent="PlayersVBox" instance=ExtResource("2_player")]
+layout_mode = 2
+Slot = 1
+Progress = "0.0%"
+IsPassing = true
+
+[node name="P2" parent="PlayersVBox" instance=ExtResource("2_player")]
+layout_mode = 2
+Slot = 2
+Progress = "66.7%"
+IsPassing = true
+
+[node name="P3" parent="PlayersVBox" instance=ExtResource("2_player")]
+layout_mode = 2
+Slot = 3
+Progress = "10.3%"
+IsPassing = false
+
+[node name="P4" parent="PlayersVBox" instance=ExtResource("2_player")]
+layout_mode = 2
+Slot = 4
+Progress = "90.7%"
+IsPassing = true
+
+[node name="P5" parent="PlayersVBox" instance=ExtResource("2_player")]
+layout_mode = 2
+Slot = 5
+Progress = "33.3%"
+IsPassing = false

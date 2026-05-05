@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using Godot;
 
 public partial class StackView : Node2D
@@ -48,17 +50,21 @@ public partial class StackView : Node2D
 	private readonly Color _highlightOuterColor = Color.FromHtml("#EEF55D");
 	private readonly Color _highlightInnerColor = Color.FromHtml("#E2C54D");
 	private readonly Color _highlightConflictColor = Color.FromHtml("#F82D23");
+	private readonly Color _pathColor = Color.FromHtml("#E4A72D");
+	private readonly Color _pathOutlineColor = Color.FromHtml("#2B2726");
+	private readonly Color _resourceHumanColor = Color.FromHtml("#C92CC1");
+	private readonly Color _resourceTechnologyColor = Color.FromHtml("#3D29ED");
+	private readonly Color _resourceEnvironmentColor = Color.FromHtml("#6CE575");
+	private readonly Color _resourceConflictColor = Color.FromHtml("#2B2726");
 	private Color? _accessibilityBaseColorOverride = null;
 	private Color? _accessibilityOverlayColorOverride = null;
 
 	[ExportGroup("Tile Stack")]
-	[Export]
 	public TileKind DownTileType { get; set; } = TileKind.Wilds;
 
 	[Export]
 	public bool HasUpTile { get; set; }
 
-	[Export]
 	public TileKind UpTileType { get; set; } = TileKind.Human;
 
 	[Export]
@@ -106,15 +112,28 @@ public partial class StackView : Node2D
 	private readonly Texture2D?[] _defaultPathTextures = new Texture2D?[6];
 	private readonly float[] _defaultPathRotations = new float[6];
 	private readonly EdgeState[] _edgeStates = new EdgeState[6];
+	private Node2D _generatedPathLayer = null!;
+	private Node2D _resourceLayer = null!;
+	private readonly List<Node> _generatedPathNodes = [];
+	private readonly List<Node> _resourceNodes = [];
 
 	private const float HoverScaleFactor = 1.5f;
 	private const float HoverScaleLerpSpeed = 12.0f;
+	private const float PathHoverDistance = 22.0f;
+	private const float PathFillWidth = 18.0f;
+	private const float PathOutlineWidth = 24.0f;
 	public static bool HoverEffectsEnabled { get; set; } = true;
 	private Vector2[] _hoverPolygon = new Vector2[0];
 	private Vector2 _hoverCenter = Vector2.Zero;
 	private int _baseZIndex;
 	private bool _isHoverZIndexApplied;
 	private const int HoverZIndexOffset = 32;
+	private int? _hoveredPathEdge;
+
+	public event Action<int?>? PathHovered;
+
+	public int TileIndex { get; set; }
+	public bool PathSelectionEnabled { get; set; }
 
 	public override void _Ready()
 	{
@@ -137,6 +156,13 @@ public partial class StackView : Node2D
 
 		var mousePosition = GetViewport().GetMousePosition();
 		var localMousePosition = ToLocal(mousePosition);
+		var hoveredPathEdge = PathSelectionEnabled ? FindHoveredPathEdge(localMousePosition) : null;
+		if (hoveredPathEdge != _hoveredPathEdge)
+		{
+			_hoveredPathEdge = hoveredPathEdge;
+			PathHovered?.Invoke(_hoveredPathEdge);
+		}
+
 		var absoluteScale = new Vector2(Mathf.Abs(Scale.X), Mathf.Abs(Scale.Y));
 		var scaledLocalMousePosition = new Vector2(
 			localMousePosition.X * absoluteScale.X,
@@ -168,6 +194,16 @@ public partial class StackView : Node2D
 		Scale = new Vector2(nextScale, nextScale);
 		var globalCenterAfter = ToGlobal(_hoverCenter);
 		Position += globalCenterBefore - globalCenterAfter;
+	}
+
+	public void SetPathSelectionEnabled(bool enabled)
+	{
+		PathSelectionEnabled = enabled;
+		if (!enabled && _hoveredPathEdge.HasValue)
+		{
+			_hoveredPathEdge = null;
+			PathHovered?.Invoke(null);
+		}
 	}
 
 	public void ConfigureTileStack(
@@ -231,7 +267,13 @@ public partial class StackView : Node2D
 		RebuildEdgeVisuals();
 	}
 
-	public void SetPath(int edgeIndex, PathKind pathKind, int rotationSteps = 0, Texture2D? pathTextureOverride = null)
+	public void SetPath(
+		int edgeIndex,
+		PathKind pathKind,
+		int rotationSteps = 0,
+		Texture2D? pathTextureOverride = null,
+		int? targetEdgeIndex = null
+	)
 	{
 		if (!IsEdgeIndexValid(edgeIndex))
 		{
@@ -241,6 +283,24 @@ public partial class StackView : Node2D
 		_edgeStates[edgeIndex].PathKind = pathKind;
 		_edgeStates[edgeIndex].PathTextureOverride = pathTextureOverride;
 		_edgeStates[edgeIndex].PathRotationOffset = Mathf.DegToRad(rotationSteps * 60.0f);
+		_edgeStates[edgeIndex].PathTargetEdge = targetEdgeIndex;
+		RebuildEdgeVisuals();
+	}
+
+	public void SetEdgeResources(int edgeIndex, IReadOnlyList<BoardResourceKind>? resources)
+	{
+		if (!IsEdgeIndexValid(edgeIndex))
+		{
+			return;
+		}
+
+		var edgeResources = _edgeStates[edgeIndex].Resources ??= [];
+		edgeResources.Clear();
+		if (resources != null)
+		{
+			edgeResources.AddRange(resources);
+		}
+
 		RebuildEdgeVisuals();
 	}
 
@@ -251,7 +311,7 @@ public partial class StackView : Node2D
 			return;
 		}
 
-		_edgeStates[edgeIndex] = default;
+		_edgeStates[edgeIndex].Clear();
 		RebuildEdgeVisuals();
 	}
 
@@ -259,7 +319,7 @@ public partial class StackView : Node2D
 	{
 		for (var i = 0; i < _edgeStates.Length; i++)
 		{
-			_edgeStates[i] = default;
+			_edgeStates[i].Clear();
 		}
 
 		RebuildEdgeVisuals();
@@ -311,6 +371,18 @@ public partial class StackView : Node2D
 		_upOutline = GetNode<Polygon2D>("TileLayer/UpOutline");
 		_upFill = GetNode<Polygon2D>("TileLayer/UpFill");
 		_edgeSlots = GetNode<Node2D>("EdgeSlots");
+		_generatedPathLayer = new Node2D
+		{
+			Name = "GeneratedPathLayer",
+			ZIndex = 6,
+		};
+		_resourceLayer = new Node2D
+		{
+			Name = "GeneratedResourceLayer",
+			ZIndex = 8,
+		};
+		AddChild(_generatedPathLayer);
+		AddChild(_resourceLayer);
 
 		for (var edgeIndex = 0; edgeIndex < 6; edgeIndex++)
 		{
@@ -319,6 +391,7 @@ public partial class StackView : Node2D
 			_defaultRelationTextures[edgeIndex] = _relationSprites[edgeIndex].Texture;
 			_defaultPathTextures[edgeIndex] = _pathSprites[edgeIndex].Texture;
 			_defaultPathRotations[edgeIndex] = _pathSprites[edgeIndex].Rotation;
+			_edgeStates[edgeIndex].Resources = [];
 		}
 	}
 
@@ -403,6 +476,132 @@ public partial class StackView : Node2D
 			_pathSprites[edgeIndex].Visible = pathTexture != null;
 			_pathSprites[edgeIndex].Rotation = ResolvePathRotation(_edgeStates[edgeIndex], edgeIndex);
 		}
+
+		RebuildGeneratedPathVisuals(center);
+		RebuildResourceVisuals(center);
+	}
+
+	private void RebuildGeneratedPathVisuals(Vector2 center)
+	{
+		ClearNodeList(_generatedPathNodes);
+
+		for (var edgeIndex = 0; edgeIndex < 6; edgeIndex++)
+		{
+			var targetEdge = _edgeStates[edgeIndex].PathTargetEdge;
+			if (_edgeStates[edgeIndex].PathKind == PathKind.None
+				|| !targetEdge.HasValue
+				|| !IsEdgeIndexValid(targetEdge.Value)
+				|| edgeIndex > targetEdge.Value)
+			{
+				continue;
+			}
+
+			var points = BuildPathPolyline(edgeIndex, targetEdge.Value, center);
+			AddPathLine(points, _pathOutlineColor, PathOutlineWidth);
+			AddPathLine(points, _pathColor, PathFillWidth);
+		}
+	}
+
+	private void RebuildResourceVisuals(Vector2 center)
+	{
+		ClearNodeList(_resourceNodes);
+
+		for (var edgeIndex = 0; edgeIndex < 6; edgeIndex++)
+		{
+			var resources = _edgeStates[edgeIndex].Resources;
+			if (resources == null || resources.Count == 0)
+			{
+				continue;
+			}
+
+			var anchor = GetEdgeAnchorPoint(edgeIndex, center, DownInnerSide, 0.7f);
+			var radial = (anchor - center).Normalized();
+			var tangent = new Vector2(-radial.Y, radial.X);
+			var count = Mathf.Min(resources.Count, 3);
+			var startOffset = -(count - 1) * 8.0f;
+
+			for (var i = 0; i < count; i++)
+			{
+				var circle = new Polygon2D
+				{
+					Color = ResolveResourceColor(resources[i]),
+					Polygon = BuildCirclePolygon(anchor + tangent * (startOffset + i * 16.0f), 6.5f, 16),
+				};
+				_resourceLayer.AddChild(circle);
+				_resourceNodes.Add(circle);
+			}
+		}
+	}
+
+	private void AddPathLine(Vector2[] points, Color color, float width)
+	{
+		var line = new Line2D
+		{
+			Points = points,
+			DefaultColor = color,
+			Width = width,
+			Antialiased = true,
+		};
+		_generatedPathLayer.AddChild(line);
+		_generatedPathNodes.Add(line);
+	}
+
+	private Vector2[] BuildPathPolyline(int edgeIndex, int targetEdgeIndex, Vector2 center)
+	{
+		var start = GetEdgeAnchorPoint(edgeIndex, center, DownInnerSide, 0.88f);
+		var end = GetEdgeAnchorPoint(targetEdgeIndex, center, DownInnerSide, 0.88f);
+		return [start, center, end];
+	}
+
+	private int? FindHoveredPathEdge(Vector2 localMousePosition)
+	{
+		var center = GetHexBounds(DownOuterSide) / 2.0f;
+		for (var edgeIndex = 0; edgeIndex < 6; edgeIndex++)
+		{
+			var targetEdge = _edgeStates[edgeIndex].PathTargetEdge;
+			if (_edgeStates[edgeIndex].PathKind == PathKind.None
+				|| !targetEdge.HasValue
+				|| !IsEdgeIndexValid(targetEdge.Value)
+				|| edgeIndex > targetEdge.Value)
+			{
+				continue;
+			}
+
+			var points = BuildPathPolyline(edgeIndex, targetEdge.Value, center);
+			var distance = Mathf.Min(
+				GetDistanceToSegment(localMousePosition, points[0], points[1]),
+				GetDistanceToSegment(localMousePosition, points[1], points[2])
+			);
+
+			if (distance <= PathHoverDistance)
+			{
+				return edgeIndex;
+			}
+		}
+
+		return null;
+	}
+
+	private Color ResolveResourceColor(BoardResourceKind kind)
+	{
+		return kind switch
+		{
+			BoardResourceKind.Human => _resourceHumanColor,
+			BoardResourceKind.Technology => _resourceTechnologyColor,
+			BoardResourceKind.Environment => _resourceEnvironmentColor,
+			BoardResourceKind.Conflict => _resourceConflictColor,
+			_ => Colors.White,
+		};
+	}
+
+	private static void ClearNodeList(List<Node> nodes)
+	{
+		foreach (var node in nodes)
+		{
+			node.QueueFree();
+		}
+
+		nodes.Clear();
 	}
 
 	private void UpdateHoverPolygon(Vector2 center)
@@ -487,6 +686,18 @@ public partial class StackView : Node2D
 		];
 	}
 
+	private static Vector2[] BuildCirclePolygon(Vector2 center, float radius, int sides)
+	{
+		var points = new Vector2[sides];
+		for (var i = 0; i < sides; i++)
+		{
+			var angle = Mathf.Tau * i / sides;
+			points[i] = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
+		}
+
+		return points;
+	}
+
 	private static Vector2 GetEdgeAnchorPoint(int edgeIndex, Vector2 center, float sideLength, float insetFactor)
 	{
 		var halfHeight = Mathf.Sqrt(3.0f) * sideLength * 0.5f;
@@ -550,11 +761,38 @@ public partial class StackView : Node2D
 		return edgeIndex >= 0 && edgeIndex < 6;
 	}
 
+	private static float GetDistanceToSegment(Vector2 point, Vector2 start, Vector2 end)
+	{
+		var segment = end - start;
+		var lengthSquared = segment.LengthSquared();
+		if (lengthSquared <= 0.0001f)
+		{
+			return point.DistanceTo(start);
+		}
+
+		var t = Mathf.Clamp((point - start).Dot(segment) / lengthSquared, 0.0f, 1.0f);
+		var projection = start + segment * t;
+		return point.DistanceTo(projection);
+	}
+
 	private struct EdgeState
 	{
 		public Texture2D? RelationTexture;
 		public PathKind PathKind;
 		public float PathRotationOffset;
 		public Texture2D? PathTextureOverride;
+		public int? PathTargetEdge;
+		public List<BoardResourceKind>? Resources;
+
+		public void Clear()
+		{
+			RelationTexture = null;
+			PathKind = PathKind.None;
+			PathRotationOffset = 0.0f;
+			PathTextureOverride = null;
+			PathTargetEdge = null;
+			Resources ??= [];
+			Resources.Clear();
+		}
 	}
 }

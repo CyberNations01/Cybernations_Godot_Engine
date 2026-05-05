@@ -12,6 +12,10 @@ public sealed class MainUiPresenter : IDisposable
 	private readonly ITeamGoalPanelView _teamGoalPanelView;
 	private readonly IInfoSummaryPanelView _infoSummaryPanelView;
 	private readonly IHiveBoardView _hiveBoardView;
+	private readonly IResourceTracksView _resourceTracksView;
+	private readonly INationLevelBadgeView _nationLevelBadgeView;
+	private readonly ITurnDotsView _turnDotsView;
+	private readonly IPlayerPanelView _playerPanelView;
 	private readonly IPlayerDetailPopupView _playerDetailPopupView;
 	private readonly IGameGateway _gateway;
 	private readonly Dictionary<int, Vector2> _pendingPlayerDetailPositions = [];
@@ -21,17 +25,26 @@ public sealed class MainUiPresenter : IDisposable
 	private TeamGoalStatePayload? _cachedTeamGoalState;
 	private InfoSummaryStatePayload? _cachedInfoSummaryState;
 	private bool _isBound;
+	private bool _developerMode;
+	private bool _pathSelectionMode;
+	private InfoSummaryStatePayload? _pathSelectionPreviousSummary;
+	private int _currentHuman;
+	private int _currentTechnology;
+	private int _currentEnvironment;
+	private int _currentConflict;
 	private readonly EnvisionController _envisionController;
-	private readonly IEnvisionGateway _envisionGateway;
 
 	public MainUiPresenter(
 		IChatPanelView chatPanelView,
 		ITeamGoalPanelView teamGoalPanelView,
 		IInfoSummaryPanelView infoSummaryPanelView,
 		IHiveBoardView hiveBoardView,
+		IResourceTracksView resourceTracksView,
+		INationLevelBadgeView nationLevelBadgeView,
+		ITurnDotsView turnDotsView,
+		IPlayerPanelView playerPanelView,
 		IPlayerDetailPopupView playerDetailPopupView,
 		EnvisionController envisionController,
-		IEnvisionGateway envisionGateway,
 		IGameGateway gateway
 	)
 	{
@@ -39,10 +52,13 @@ public sealed class MainUiPresenter : IDisposable
 		_teamGoalPanelView = teamGoalPanelView;
 		_infoSummaryPanelView = infoSummaryPanelView;
 		_hiveBoardView = hiveBoardView;
+		_resourceTracksView = resourceTracksView;
+		_nationLevelBadgeView = nationLevelBadgeView;
+		_turnDotsView = turnDotsView;
+		_playerPanelView = playerPanelView;
 		_playerDetailPopupView = playerDetailPopupView;
 		_gateway = gateway;
 		_envisionController = envisionController;
-		_envisionGateway = envisionGateway;
 	}
 
 	public void Initialize()
@@ -63,7 +79,7 @@ public sealed class MainUiPresenter : IDisposable
 
 		_playerDetailPopupView.CloseRequested += OnPlayerDetailCloseRequested;
 		_gateway.ServerPacketReceived += OnServerPacketReceived;
-		_envisionGateway.OnStateUpdated += OnStateUpdated;
+		_hiveBoardView.PathHovered += OnBoardPathHovered;
 
 		_chatPanelView.SetExpanded(false);
 		_teamGoalPanelView.SetDropdownVisible(false);
@@ -121,6 +137,7 @@ public sealed class MainUiPresenter : IDisposable
 
 		_playerDetailPopupView.CloseRequested -= OnPlayerDetailCloseRequested;
 		_gateway.ServerPacketReceived -= OnServerPacketReceived;
+		_hiveBoardView.PathHovered -= OnBoardPathHovered;
 		_isBound = false;
 	}
 
@@ -136,6 +153,11 @@ public sealed class MainUiPresenter : IDisposable
 
 	private void OnChatSubmitted(string text)
 	{
+		if (TryHandleDeveloperModeInput(text))
+		{
+			return;
+		}
+
 		_gateway.SendPacket(
 			GamePacketCodec.BuildCommand(
 				PacketTypes.CmdChatSubmit,
@@ -147,27 +169,32 @@ public sealed class MainUiPresenter : IDisposable
 	}
 	
 	public void OnEnvisionActionRequested(EnvisionActionRequest request)
-{
-	GD.Print($"Presenter received envision request: {request.Action}");
-
-	_envisionGateway.SendAction(request);
-}
-
-private static string BuildEnvisionStatusMessage(EnvisionActionRequest request)
-{
-	return request.Action switch
 	{
-		"ShiftPower" => $"Request received: Shift Power -> Player {request.TargetPlayerId + 1}",
-		"Connect" => $"Request received: Connect ({request.SpendType} → {request.GainType})",
-		"SetCourse" => $"Request received: Set Course -> {request.Mode}",
-		"Steer" when request.Mode == "AddReserveToken" => $"Request received: Steer -> Add {request.FeedbackTokenType} Feedback",
-		"Steer" => $"Request received: Steer -> {request.Mode}",
-		"ComeTogether" => "Request received: Come Together",
-		"Prepare" => "Request received: Prepare",
-		"Pass" => "Request received: Pass",
-		_ => $"Request received: {request.Action}"
-	};
-}
+		GD.Print($"Presenter received envision request: {request.Action}");
+
+		_gateway.SendPacket(
+			GamePacketCodec.BuildCommand(
+				PacketTypes.CmdEnvisionAction,
+				LocalRoomId,
+				LocalPlayerId,
+				new EnvisionActionPayload(
+					request.Action,
+					request.TargetPlayerId,
+					request.SpendType,
+					request.GainType,
+					request.Mode,
+					request.FeedbackTokenType,
+					request.SelectedFeedbackTrackIndex,
+					request.TrackTokenType,
+					request.DrawnTokenType1,
+					request.DrawnTokenType2,
+					request.TokenToTrack,
+					request.TokenToBag,
+					request.TokenToReserve
+				)
+			)
+		);
+	}
 
 	private void OnTeamGoalToggleRequested()
 	{
@@ -284,15 +311,16 @@ private static string BuildEnvisionStatusMessage(EnvisionActionRequest request)
 			case PacketTypes.EvtHiveBoardState:
 				ApplyHiveBoardState(envelope);
 				break;
+			case PacketTypes.EvtEnvisionState:
+				ApplyEnvisionState(envelope);
+				break;
+			case PacketTypes.EvtDevConsoleResult:
+				ApplyDevConsoleResult(envelope);
+				break;
 			case PacketTypes.EvtError:
 				ApplyError(envelope);
 				break;
 		}
-	}
-	
-	private void OnStateUpdated(EnvisionUiState state)
-	{
-		_envisionController.ApplyState(state);
 	}
 
 	private void ApplySnapshotFull(in PacketEnvelope envelope)
@@ -302,7 +330,11 @@ private static string BuildEnvisionStatusMessage(EnvisionActionRequest request)
 			return;
 		}
 
-		_chatPanelView.SetMessages(payload.chat_messages ?? Array.Empty<ChatMessageVm>());
+		if (payload.chat_messages is { Length: > 0 } chatMessages)
+		{
+			_chatPanelView.SetMessages(chatMessages);
+		}
+
 		if (payload.team_goal.HasValue)
 		{
 			var teamGoal = payload.team_goal.Value;
@@ -314,7 +346,10 @@ private static string BuildEnvisionStatusMessage(EnvisionActionRequest request)
 		{
 			var infoSummary = payload.info_summary.Value;
 			_cachedInfoSummaryState = infoSummary;
-			_infoSummaryPanelView.SetSummary(infoSummary.title, infoSummary.body);
+			if (!_pathSelectionMode)
+			{
+				_infoSummaryPanelView.SetSummary(infoSummary.title, infoSummary.body);
+			}
 		}
 
 		if (payload.hive_board.HasValue)
@@ -379,7 +414,10 @@ private static string BuildEnvisionStatusMessage(EnvisionActionRequest request)
 		}
 
 		_cachedInfoSummaryState = payload;
-		_infoSummaryPanelView.SetSummary(payload.title, payload.body);
+		if (!_pathSelectionMode)
+		{
+			_infoSummaryPanelView.SetSummary(payload.title, payload.body);
+		}
 		if (_infoSummaryDetailOpenPending)
 		{
 			_infoSummaryPanelView.SetDropdownVisible(true);
@@ -395,6 +433,115 @@ private static string BuildEnvisionStatusMessage(EnvisionActionRequest request)
 		}
 
 		ApplyHiveBoardPayload(payload);
+	}
+
+	private void ApplyEnvisionState(in PacketEnvelope envelope)
+	{
+		if (!GamePacketCodec.TryDeserializePayload<EnvisionStatePayload>(envelope, out var payload))
+		{
+			return;
+		}
+
+		var playerPayloads = payload.players ?? Array.Empty<EnvisionPlayerStatePayload>();
+		var players = new PlayerState[playerPayloads.Length];
+		for (var i = 0; i < players.Length; i++)
+		{
+			var player = playerPayloads[i];
+			players[i] = new PlayerState
+			{
+				Id = player.id,
+				People = player.people,
+				Environment = player.environment,
+				Technology = player.technology,
+				Cybernation = player.cybernation,
+				Cohesion = player.cohesion,
+				PassedThisTurn = player.passed_this_turn,
+				HandSize = player.hand_size,
+				IsFirstPlayer = player.is_first_player,
+				Progress = player.progress,
+			};
+		}
+
+		if (players.Length > 0)
+		{
+			var resourceIndex = FindPlayerIndex(players, payload.current_player_id);
+			var resourcePlayer = players[resourceIndex];
+			_currentHuman = resourcePlayer.People;
+			_currentTechnology = resourcePlayer.Technology;
+			_currentEnvironment = resourcePlayer.Environment;
+			_currentConflict = payload.conflict;
+			_resourceTracksView.SetResources(
+				resourcePlayer.People,
+				resourcePlayer.Technology,
+				resourcePlayer.Environment,
+				payload.conflict
+			);
+			_nationLevelBadgeView.SetLevel(resourcePlayer.Cybernation);
+		}
+		_turnDotsView.SetCompletedTurns(payload.completed_rounds);
+		_playerPanelView.SetPlayers(BuildPlayerPanelPlayers(players));
+
+		_envisionController.ApplyState(
+			new EnvisionUiState
+			{
+				IsVisible = payload.is_visible,
+				IsLocalPlayersTurn = payload.is_local_players_turn,
+				CurrentPlayerId = payload.current_player_id,
+				LocalPlayerId = payload.local_player_id,
+				Players = players,
+				CanShiftPower = payload.can_shift_power,
+				CanComeTogether = payload.can_come_together,
+				CanConnect = payload.can_connect,
+				CanSetCourse = payload.can_set_course,
+				CanPrepare = payload.can_prepare,
+				CanSteer = payload.can_steer,
+				CanPass = payload.can_pass,
+				StatusMessage = payload.status_message,
+			}
+		);
+	}
+
+	private static PlayerPanelPlayerVm[] BuildPlayerPanelPlayers(IReadOnlyList<PlayerState> players)
+	{
+		var panelPlayers = new PlayerPanelPlayerVm[players.Count];
+		for (var i = 0; i < players.Count; i++)
+		{
+			var player = players[i];
+			var progress = string.IsNullOrWhiteSpace(player.Progress)
+				? BuildFallbackPlayerProgress(player)
+				: player.Progress!;
+
+			panelPlayers[i] = new PlayerPanelPlayerVm(
+				player.Id + 1,
+				progress,
+				player.PassedThisTurn
+			);
+		}
+
+		return panelPlayers;
+	}
+
+	private static string BuildFallbackPlayerProgress(PlayerState player)
+	{
+		if (player.HandSize > 0)
+		{
+			return player.HandSize == 1 ? "1 card" : $"{player.HandSize} cards";
+		}
+
+		return $"{Math.Clamp(player.Cohesion, 0, 100)}%";
+	}
+
+	private static int FindPlayerIndex(IReadOnlyList<PlayerState> players, int playerId)
+	{
+		for (var i = 0; i < players.Count; i++)
+		{
+			if (players[i].Id == playerId)
+			{
+				return i;
+			}
+		}
+
+		return Math.Clamp(playerId, 0, players.Count - 1);
 	}
 
 	private void ApplyHiveBoardPayload(HiveBoardStatePayload payload)
@@ -431,7 +578,9 @@ private static string BuildEnvisionStatusMessage(EnvisionActionRequest request)
 							edgePayload.relation_texture_path,
 							ParseBoardPathKind(edgePayload.path_kind),
 							edgePayload.rotation_steps,
-							edgePayload.path_texture_path
+							edgePayload.path_target_edge,
+							edgePayload.path_texture_path,
+							ParseBoardResources(edgePayload.resources)
 						)
 					);
 				}
@@ -451,6 +600,61 @@ private static string BuildEnvisionStatusMessage(EnvisionActionRequest request)
 		}
 
 		_hiveBoardView.ApplyTiles(tiles);
+	}
+
+	private static BoardResourceKind[] ParseBoardResources(string[]? resources)
+	{
+		if (resources == null || resources.Length == 0)
+		{
+			return [];
+		}
+
+		var parsed = new List<BoardResourceKind>(resources.Length);
+		foreach (var resource in resources)
+		{
+			if (TryParseBoardResourceKind(resource, out var kind))
+			{
+				parsed.Add(kind);
+			}
+		}
+
+		return parsed.ToArray();
+	}
+
+	private static bool TryParseBoardResourceKind(string? value, out BoardResourceKind kind)
+	{
+		if (string.IsNullOrWhiteSpace(value))
+		{
+			kind = BoardResourceKind.Human;
+			return false;
+		}
+
+		var normalized = value.Trim().ToLowerInvariant().Replace("_", string.Empty).Replace("-", string.Empty);
+		switch (normalized)
+		{
+			case "hr":
+			case "human":
+			case "humanrelation":
+			case "people":
+				kind = BoardResourceKind.Human;
+				return true;
+			case "tech":
+			case "technology":
+				kind = BoardResourceKind.Technology;
+				return true;
+			case "env":
+			case "environment":
+				kind = BoardResourceKind.Environment;
+				return true;
+			case "co":
+			case "conflict":
+			case "minusco":
+				kind = BoardResourceKind.Conflict;
+				return true;
+			default:
+				kind = BoardResourceKind.Human;
+				return false;
+		}
 	}
 
 	private static bool TryParseBoardTileKind(string? value, out BoardTileKind kind)
@@ -513,5 +717,163 @@ private static string BuildEnvisionStatusMessage(EnvisionActionRequest request)
 		}
 
 		GD.PushWarning($"MainUiPresenter: server error code={payload.code}, reason={payload.reason}, req_id={envelope.req_id ?? "none"}");
+	}
+
+	private bool TryHandleDeveloperModeInput(string text)
+	{
+		var command = text.Trim();
+		if (command.Equals("/dev activate", StringComparison.OrdinalIgnoreCase))
+		{
+			_developerMode = true;
+			_chatPanelView.AddMessage(
+				new ChatMessageVm(
+					"DEV",
+					"Developer mode activated. Enter REST commands like GET /state, /random simulation, or /test path random simulation. Use /dev deactivate to exit."
+				)
+			);
+			return true;
+		}
+
+		if (command.Equals("/dev deactivate", StringComparison.OrdinalIgnoreCase))
+		{
+			_developerMode = false;
+			ExitPathSelectionMode();
+			_chatPanelView.AddMessage(new ChatMessageVm("DEV", "Developer mode deactivated."));
+			return true;
+		}
+
+		if (!_developerMode)
+		{
+			return false;
+		}
+
+		if (IsPathRandomCommand(command))
+		{
+			EnterPathSelectionMode();
+		}
+
+		_chatPanelView.AddMessage(new ChatMessageVm("DEV>", command));
+		_gateway.SendPacket(
+			GamePacketCodec.BuildCommand(
+				PacketTypes.CmdDevConsoleCommand,
+				LocalRoomId,
+				LocalPlayerId,
+				new DevConsoleCommandPayload(command)
+			)
+		);
+		return true;
+	}
+
+	private static bool IsPathRandomCommand(string command)
+	{
+		return command.Equals("/test path random simulation", StringComparison.OrdinalIgnoreCase)
+			|| command.Equals("/test path random generate", StringComparison.OrdinalIgnoreCase);
+	}
+
+	private void EnterPathSelectionMode()
+	{
+		if (!_pathSelectionMode)
+		{
+			_pathSelectionPreviousSummary = _cachedInfoSummaryState;
+		}
+
+		_pathSelectionMode = true;
+		_hiveBoardView.SetPathSelectionEnabled(true);
+		SetPathSelectionInstructionSummary();
+	}
+
+	private void ExitPathSelectionMode()
+	{
+		if (!_pathSelectionMode)
+		{
+			return;
+		}
+
+		_pathSelectionMode = false;
+		_hiveBoardView.SetPathSelectionEnabled(false);
+		var summary = _pathSelectionPreviousSummary ?? _cachedInfoSummaryState;
+		if (summary.HasValue)
+		{
+			_infoSummaryPanelView.SetSummary(summary.Value.title, summary.Value.body);
+		}
+
+		_pathSelectionPreviousSummary = null;
+	}
+
+	private void OnBoardPathHovered(BoardPathHoverVm? hover)
+	{
+		if (!_pathSelectionMode)
+		{
+			return;
+		}
+
+		if (!hover.HasValue)
+		{
+			SetPathSelectionInstructionSummary();
+			return;
+		}
+
+		var value = hover.Value;
+		var resources = value.Resources;
+		var nextConflict = Math.Max(0, _currentConflict + resources.Conflict);
+		var resourceCap = Math.Max(0, 25 - nextConflict);
+		var nextHuman = Math.Clamp(_currentHuman + resources.Human, 0, resourceCap);
+		var nextTechnology = Math.Clamp(_currentTechnology + resources.Technology, 0, resourceCap);
+		var nextEnvironment = Math.Clamp(_currentEnvironment + resources.Environment, 0, resourceCap);
+
+		_infoSummaryPanelView.SetSummary(
+			"Path Selection",
+			$"Connected path #{value.ComponentId}\n" +
+			$"Hovered edge: Tile {value.TileIndex}, Edge {value.EdgeIndex}\n\n" +
+			$"Gain from this connected path:\n" +
+			$"Human: +{resources.Human}\n" +
+			$"Tech: +{resources.Technology}\n" +
+			$"Environment: +{resources.Environment}\n" +
+			$"Conflict: +{resources.Conflict}\n\n" +
+			$"After gain:\n" +
+			$"Human: {nextHuman}/{resourceCap}\n" +
+			$"Tech: {nextTechnology}/{resourceCap}\n" +
+			$"Environment: {nextEnvironment}/{resourceCap}\n" +
+			$"Conflict: {nextConflict}"
+		);
+	}
+
+	private void SetPathSelectionInstructionSummary()
+	{
+		_infoSummaryPanelView.SetSummary(
+			"Path Selection",
+			"Hover over a connected path on the board.\n\n" +
+			"The panel will show resources gained from that connected path and the resulting resource track values.\n\n" +
+			"Use /test path random generate to draw 11 new stacks from the backend stack catalog."
+		);
+	}
+
+	private void ApplyDevConsoleResult(in PacketEnvelope envelope)
+	{
+		if (!GamePacketCodec.TryDeserializePayload<DevConsoleResultPayload>(envelope, out var payload))
+		{
+			_chatPanelView.AddMessage(new ChatMessageVm("DEV ERROR", "Invalid developer console result payload."));
+			return;
+		}
+
+		var statusLine = payload.status_code > 0 ? $"HTTP {payload.status_code}\n" : "";
+		var body = string.IsNullOrWhiteSpace(payload.body) ? "(empty response)" : payload.body;
+		_chatPanelView.AddMessage(
+			new ChatMessageVm(
+				payload.success ? "DEV" : "DEV ERROR",
+				$"{statusLine}{TrimDevConsoleBody(body)}"
+			)
+		);
+	}
+
+	private static string TrimDevConsoleBody(string body)
+	{
+		const int maxLength = 6000;
+		if (body.Length <= maxLength)
+		{
+			return body;
+		}
+
+		return body[..maxLength] + "\n... output truncated ...";
 	}
 }
