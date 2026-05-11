@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 
 public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
@@ -9,6 +10,10 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 	private readonly Color _wastedColor = Color.FromHtml("#D07D29");
 	private readonly Color _humanOverlayColor = Color.FromHtml("#C92CC1");
 	private readonly Color _techOverlayColor = Color.FromHtml("#3D29ED");
+	private const string WildsTexturePath = "res://assets/Wilds.png";
+	private const string WastedTexturePath = "res://assets/Waste.png";
+	private const string HumanTexturePath = "res://assets/Human.png";
+	private const string TechnologyTexturePath = "res://assets/Tech.png";
 
 	private Panel _previewPanel = null!;
 	private Label _previewTitleLabel = null!;
@@ -20,6 +25,7 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 	private Node? _dropdownOriginalParent;
 	private int _dropdownOriginalIndex;
 	private Vector2 _dropdownLocalPosition = Vector2.Zero;
+	private readonly Dictionary<string, Texture2D?> _hexTextureCache = [];
 
 	public event Action? ToggleRequested;
 	public event Action? CloseRequested;
@@ -346,14 +352,31 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 		}
 
 		var baseColor = tile.Base == HexBase.Wilds ? _wildsColor : _wastedColor;
+		var hasOverlay = tile.Overlay != OverlayType.None;
+		var baseTexture = ResolveHexBaseTexture(tile.Base);
 		wrapper.AddChild(CreateHexPolygon(outerSide, center, _inkColor));
-		wrapper.AddChild(CreateHexPolygon(innerSide, center, baseColor));
+		if (!hasOverlay && baseTexture != null)
+		{
+			wrapper.AddChild(CreateHexTextureClip(innerSide, center, baseTexture));
+		}
+		else
+		{
+			wrapper.AddChild(CreateHexPolygon(innerSide, center, baseColor));
+		}
 
-		if (tile.Overlay != OverlayType.None)
+		if (hasOverlay)
 		{
 			var overlayColor = tile.Overlay == OverlayType.Human ? _humanOverlayColor : _techOverlayColor;
+			var overlayTexture = ResolveOverlayTexture(tile.Overlay);
 			wrapper.AddChild(CreateHexPolygon(overlayOuterSide, center, _inkColor));
-			wrapper.AddChild(CreateHexPolygon(overlayInnerSide, center, overlayColor));
+			if (overlayTexture != null)
+			{
+				wrapper.AddChild(CreateHexTextureClip(overlayInnerSide, center, overlayTexture));
+			}
+			else
+			{
+				wrapper.AddChild(CreateHexPolygon(overlayInnerSide, center, overlayColor));
+			}
 		}
 
 		return wrapper;
@@ -418,6 +441,77 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 		polygon.Color = color;
 		polygon.Polygon = BuildRegularHexPolygon(sideLength, center);
 		return polygon;
+	}
+
+	private Texture2D? ResolveHexBaseTexture(HexBase hexBase)
+	{
+		return hexBase switch
+		{
+			HexBase.Wilds => LoadHexTexture(WildsTexturePath),
+			HexBase.Wasted => LoadHexTexture(WastedTexturePath),
+			_ => null,
+		};
+	}
+
+	private Texture2D? ResolveOverlayTexture(OverlayType overlay)
+	{
+		return overlay switch
+		{
+			OverlayType.Human => LoadHexTexture(HumanTexturePath),
+			OverlayType.Tech => LoadHexTexture(TechnologyTexturePath),
+			_ => null,
+		};
+	}
+
+	private Texture2D? LoadHexTexture(string path)
+	{
+		if (_hexTextureCache.TryGetValue(path, out var cachedTexture))
+		{
+			return cachedTexture;
+		}
+
+		if (!ResourceLoader.Exists(path))
+		{
+			_hexTextureCache[path] = null;
+			return null;
+		}
+
+		var texture = GD.Load<Texture2D>(path);
+		_hexTextureCache[path] = texture;
+		return texture;
+	}
+
+	private static Polygon2D CreateHexTextureClip(float sideLength, Vector2 center, Texture2D texture)
+	{
+		var clip = new Polygon2D
+		{
+			Color = Colors.White,
+			ClipChildren = ClipChildrenMode.Only,
+			Polygon = BuildRegularHexPolygon(sideLength, center),
+		};
+		var sprite = new Sprite2D
+		{
+			Texture = texture,
+			Position = center,
+			Centered = true,
+		};
+		var textureSize = texture.GetSize();
+		var targetSize = GetHexBounds(sideLength);
+		var scale = GetAspectCoveredScale(textureSize, targetSize);
+		sprite.Scale = new Vector2(scale, scale);
+
+		clip.AddChild(sprite);
+		return clip;
+	}
+
+	private static float GetAspectCoveredScale(Vector2 sourceSize, Vector2 targetSize)
+	{
+		if (sourceSize.X <= 0.0f || sourceSize.Y <= 0.0f)
+		{
+			return 1.0f;
+		}
+
+		return Mathf.Max(targetSize.X / sourceSize.X, targetSize.Y / sourceSize.Y);
 	}
 
 	private static Vector2 GetHexBounds(float sideLength)

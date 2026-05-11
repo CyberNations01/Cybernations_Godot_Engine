@@ -98,18 +98,42 @@ public partial class StackView : Node2D
 	[Export]
 	public Texture2D? PathTypeETexture { get; set; }
 
+	[ExportGroup("Tile Textures")]
+	[Export]
+	public Texture2D? WildsTexture { get; set; }
+
+	[Export]
+	public Texture2D? WastedTexture { get; set; }
+
+	[Export]
+	public Texture2D? HumanTexture { get; set; }
+
+	[Export]
+	public Texture2D? TechnologyTexture { get; set; }
+
+	private const string WildsTexturePath = "res://assets/Wilds.png";
+	private const string WastedTexturePath = "res://assets/Waste.png";
+	private const string HumanTexturePath = "res://assets/Human.png";
+	private const string TechnologyTexturePath = "res://assets/Tech.png";
+
 	private Polygon2D _conflictOuter = null!;
 	private Polygon2D _conflictInner = null!;
 	private Polygon2D _conflictCore = null!;
+	private Node2D _tileLayer = null!;
 	private Polygon2D _downOutline = null!;
 	private Polygon2D _downFill = null!;
 	private Polygon2D _upOutline = null!;
 	private Polygon2D _upFill = null!;
+	private Polygon2D _downTextureClip = null!;
+	private Polygon2D _upTextureClip = null!;
+	private Sprite2D _downTextureSprite = null!;
+	private Sprite2D _upTextureSprite = null!;
 	private Node2D _edgeSlots = null!;
 	private readonly Sprite2D[] _relationSprites = new Sprite2D[6];
 	private readonly Sprite2D[] _pathSprites = new Sprite2D[6];
 	private readonly Texture2D?[] _defaultRelationTextures = new Texture2D?[6];
 	private readonly Texture2D?[] _defaultPathTextures = new Texture2D?[6];
+	private readonly Dictionary<TileKind, Texture2D?> _tileTextureCache = [];
 	private readonly float[] _defaultPathRotations = new float[6];
 	private readonly EdgeState[] _edgeStates = new EdgeState[6];
 	private Polygon2D _pathClipMask = null!;
@@ -356,21 +380,24 @@ public partial class StackView : Node2D
 	}
 	
 	public void ApplyAccessibilityColor(Color? baseColorOverride, Color? overlayColorOverride = null)
-{
-	_accessibilityBaseColorOverride = baseColorOverride;
-	_accessibilityOverlayColorOverride = overlayColorOverride;
-	RebuildTileVisuals();
-}
+	{
+		_accessibilityBaseColorOverride = baseColorOverride;
+		_accessibilityOverlayColorOverride = overlayColorOverride;
+		RebuildTileVisuals();
+	}
 
 	private void BindNodes()
 	{
 		_conflictOuter = GetNode<Polygon2D>("ConflictLayer/ConflictOuter");
 		_conflictInner = GetNode<Polygon2D>("ConflictLayer/ConflictInner");
 		_conflictCore = GetNode<Polygon2D>("ConflictLayer/ConflictCore");
+		_tileLayer = GetNode<Node2D>("TileLayer");
 		_downOutline = GetNode<Polygon2D>("TileLayer/DownOutline");
 		_downFill = GetNode<Polygon2D>("TileLayer/DownFill");
 		_upOutline = GetNode<Polygon2D>("TileLayer/UpOutline");
 		_upFill = GetNode<Polygon2D>("TileLayer/UpFill");
+		CreateTextureClipNodes();
+		ConfigureTileDrawOrder();
 		_edgeSlots = GetNode<Node2D>("EdgeSlots");
 		_pathClipMask = new Polygon2D
 		{
@@ -437,6 +464,8 @@ public partial class StackView : Node2D
 		_downFill.Polygon = BuildRegularHexPolygon(DownInnerSide, center);
 		_upOutline.Polygon = BuildRegularHexPolygon(UpOuterSide, center);
 		_upFill.Polygon = BuildRegularHexPolygon(UpInnerSide, center);
+		_downTextureClip.Polygon = BuildRegularHexPolygon(DownInnerSide, center);
+		_upTextureClip.Polygon = BuildRegularHexPolygon(UpInnerSide, center);
 		_pathClipMask.Polygon = BuildRegularHexPolygon(DownOuterSide, center);
 
 		if (ConflictHighlight)
@@ -448,6 +477,8 @@ public partial class StackView : Node2D
 			_downFill.Visible = false;
 			_upOutline.Visible = false;
 			_upFill.Visible = false;
+			_downTextureClip.Visible = false;
+			_upTextureClip.Visible = false;
 			return;
 		}
 
@@ -456,13 +487,27 @@ public partial class StackView : Node2D
 		_conflictCore.Visible = false;
 
 		_downOutline.Visible = true;
-		_downFill.Visible = true;
 		_downFill.Color = ResolveTileColor(DownTileType);
+		var downTexture = ResolveTileTexture(DownTileType);
+		var showDownTexture = !HasUpTile && !_accessibilityBaseColorOverride.HasValue && downTexture != null;
+		_downFill.Visible = !showDownTexture;
+		_downTextureClip.Visible = showDownTexture;
+		if (showDownTexture)
+		{
+			ConfigureTextureSprite(_downTextureSprite, downTexture!, center, DownInnerSide);
+		}
 
 		var showUp = HasUpTile;
 		_upOutline.Visible = showUp;
-		_upFill.Visible = showUp;
-		if (showUp)
+		var upTexture = showUp ? ResolveTileTexture(UpTileType) : null;
+		var showUpTexture = showUp && !_accessibilityOverlayColorOverride.HasValue && upTexture != null;
+		_upFill.Visible = showUp && !showUpTexture;
+		_upTextureClip.Visible = showUpTexture;
+		if (showUpTexture)
+		{
+			ConfigureTextureSprite(_upTextureSprite, upTexture!, center, UpInnerSide);
+		}
+		else if (showUp)
 		{
 			_upFill.Color = ResolveTileColor(UpTileType);
 		}
@@ -541,6 +586,47 @@ public partial class StackView : Node2D
 				_resourceNodes.Add(circle);
 			}
 		}
+	}
+
+	private void CreateTextureClipNodes()
+	{
+		_downTextureClip = new Polygon2D
+		{
+			Name = "GeneratedDownTextureClip",
+			Color = Colors.White,
+			ClipChildren = ClipChildrenMode.Only,
+		};
+		_downTextureSprite = new Sprite2D
+		{
+			Name = "TextureSprite",
+			Centered = true,
+		};
+		_downTextureClip.AddChild(_downTextureSprite);
+		_tileLayer.AddChild(_downTextureClip);
+
+		_upTextureClip = new Polygon2D
+		{
+			Name = "GeneratedUpTextureClip",
+			Color = Colors.White,
+			ClipChildren = ClipChildrenMode.Only,
+		};
+		_upTextureSprite = new Sprite2D
+		{
+			Name = "TextureSprite",
+			Centered = true,
+		};
+		_upTextureClip.AddChild(_upTextureSprite);
+		_tileLayer.AddChild(_upTextureClip);
+	}
+
+	private void ConfigureTileDrawOrder()
+	{
+		_downOutline.ZIndex = 0;
+		_downFill.ZIndex = 1;
+		_downTextureClip.ZIndex = 1;
+		_upOutline.ZIndex = 2;
+		_upFill.ZIndex = 3;
+		_upTextureClip.ZIndex = 3;
 	}
 
 	private void AddPathLine(Vector2[] points, Color color, float width)
@@ -631,6 +717,59 @@ public partial class StackView : Node2D
 	{
 		_hoverCenter = center;
 		_hoverPolygon = BuildRegularHexPolygon(DownOuterSide, center);
+	}
+
+	private Texture2D? ResolveTileTexture(TileKind tileKind)
+	{
+		return tileKind switch
+		{
+			TileKind.Wilds => WildsTexture ?? LoadTileTexture(tileKind, WildsTexturePath),
+			TileKind.Wasted => WastedTexture ?? LoadTileTexture(tileKind, WastedTexturePath),
+			TileKind.Human => HumanTexture ?? LoadTileTexture(tileKind, HumanTexturePath),
+			TileKind.Technology => TechnologyTexture ?? LoadTileTexture(tileKind, TechnologyTexturePath),
+			_ => null,
+		};
+	}
+
+	private Texture2D? LoadTileTexture(TileKind tileKind, string path)
+	{
+		if (_tileTextureCache.TryGetValue(tileKind, out var cachedTexture))
+		{
+			return cachedTexture;
+		}
+
+		if (!ResourceLoader.Exists(path))
+		{
+			_tileTextureCache[tileKind] = null;
+			return null;
+		}
+
+		var texture = GD.Load<Texture2D>(path);
+		_tileTextureCache[tileKind] = texture;
+		return texture;
+	}
+
+	private static void ConfigureTextureSprite(Sprite2D sprite, Texture2D texture, Vector2 center, float sideLength)
+	{
+		var targetSize = GetHexBounds(sideLength);
+		var textureSize = texture.GetSize();
+		var scale = GetAspectCoveredScale(textureSize, targetSize);
+
+		sprite.Texture = texture;
+		sprite.Position = center;
+		sprite.Rotation = 0.0f;
+		sprite.Scale = new Vector2(scale, scale);
+		sprite.Modulate = Colors.White;
+	}
+
+	private static float GetAspectCoveredScale(Vector2 sourceSize, Vector2 targetSize)
+	{
+		if (sourceSize.X <= 0.0f || sourceSize.Y <= 0.0f)
+		{
+			return 1.0f;
+		}
+
+		return Mathf.Max(targetSize.X / sourceSize.X, targetSize.Y / sourceSize.Y);
 	}
 
 	private Texture2D? ResolvePathTexture(EdgeState state, int edgeIndex)

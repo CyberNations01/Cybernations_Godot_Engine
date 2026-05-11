@@ -31,3 +31,9 @@ Use
 `./out/room-server`
 
 run server before initialize the game.
+The server controler can be found at `file:///.../CyberNationsWithStructure/ServerForTest/room_test.html`
+
+# [2026/5/11 UPDATE]
+
+## ADD
+1. Assets. Hex-tiles `Human`, `Tech`, `Waste`, `Wilds`.
