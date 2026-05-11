@@ -10,6 +10,7 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 	private readonly Color _wastedColor = Color.FromHtml("#D07D29");
 	private readonly Color _humanOverlayColor = Color.FromHtml("#C92CC1");
 	private readonly Color _techOverlayColor = Color.FromHtml("#3D29ED");
+	private const float HexOutlineWidth = 7.0f;
 	private const string WildsTexturePath = "res://assets/Wilds.png";
 	private const string WastedTexturePath = "res://assets/Waste.png";
 	private const string HumanTexturePath = "res://assets/Human.png";
@@ -232,9 +233,9 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 		section.AddChild(CreateTextLabel("Hivegrid Snapshot (Conflict Highlight)", 24, Colors.Black, new Vector2(28, 16), new Vector2(size.X - 56, 34), HorizontalAlignment.Left));
 
 		const float miniOuterSide = 62.0f;
-		const float miniInnerSide = 58.0f;
+		const float miniInnerSide = miniOuterSide - HexOutlineWidth;
 		const float miniOverlayOuterSide = 46.0f;
-		const float miniOverlayInnerSide = 42.0f;
+		const float miniOverlayInnerSide = miniOverlayOuterSide - HexOutlineWidth;
 		const float miniPositionScale = 0.5f;
 
 		var boardArea = new Rect2(36, 58, size.X - 72, size.Y - 84);

@@ -50,8 +50,8 @@ public partial class StackView : Node2D
 	private readonly Color _highlightOuterColor = Color.FromHtml("#EEF55D");
 	private readonly Color _highlightInnerColor = Color.FromHtml("#E2C54D");
 	private readonly Color _highlightConflictColor = Color.FromHtml("#F82D23");
-	private readonly Color _pathColor = Color.FromHtml("#E4A72D");
-	private readonly Color _pathOutlineColor = Color.FromHtml("#2B2726");
+	private readonly Color _pathColor = Color.FromHtml("#D9D9D9");
+	private readonly Color _pathOutlineColor = Colors.Black;
 	private readonly Color _resourceHumanColor = Color.FromHtml("#C92CC1");
 	private readonly Color _resourceTechnologyColor = Color.FromHtml("#3D29ED");
 	private readonly Color _resourceEnvironmentColor = Color.FromHtml("#6CE575");
@@ -74,13 +74,13 @@ public partial class StackView : Node2D
 	public float DownOuterSide { get; set; } = 112.0f;
 
 	[Export]
-	public float DownInnerSide { get; set; } = 108.0f;
+	public float DownInnerSide { get; set; } = 105.0f;
 
 	[Export]
 	public float UpOuterSide { get; set; } = 84.0f;
 
 	[Export]
-	public float UpInnerSide { get; set; } = 80.0f;
+	public float UpInnerSide { get; set; } = 77.0f;
 
 	[ExportGroup("Path Texture Interface")]
 	[Export]
@@ -145,8 +145,12 @@ public partial class StackView : Node2D
 	private const float HoverScaleFactor = 1.5f;
 	private const float HoverScaleLerpSpeed = 12.0f;
 	private const float PathHoverDistance = 22.0f;
-	private const float PathFillWidth = 18.0f;
-	private const float PathOutlineWidth = 24.0f;
+	private const float PathFillWidth = 6.0f;
+	private const float PathOutlineWidth = 12.0f;
+	private const float PathEndpointExtension = 16.0f;
+	private const float HexOutlineWidth = 7.0f;
+	private const float ResourceDotRadius = 6.5f;
+	private const float ResourceDotSpacing = ResourceDotRadius * 2.5f;
 	public static bool HoverEffectsEnabled { get; set; } = true;
 	private Vector2[] _hoverPolygon = new Vector2[0];
 	private Vector2 _hoverCenter = Vector2.Zero;
@@ -236,9 +240,9 @@ public partial class StackView : Node2D
 		TileKind? upTileType,
 		bool conflictHighlight,
 		float downOuterSide = 112.0f,
-		float downInnerSide = 108.0f,
+		float downInnerSide = 105.0f,
 		float upOuterSide = 84.0f,
-		float upInnerSide = 80.0f
+		float upInnerSide = 77.0f
 	)
 	{
 		DownTileType = downTileType;
@@ -449,6 +453,10 @@ public partial class StackView : Node2D
 	private void RebuildTileVisuals()
 	{
 		var center = GetHexBounds(DownOuterSide) / 2.0f;
+		var downInnerSide = GetHexInnerSide(DownOuterSide);
+		var upInnerSide = GetHexInnerSide(UpOuterSide);
+		DownInnerSide = downInnerSide;
+		UpInnerSide = upInnerSide;
 		UpdateHoverPolygon(center);
 
 		_conflictOuter.Color = _highlightOuterColor;
@@ -459,13 +467,13 @@ public partial class StackView : Node2D
 
 		_conflictOuter.Polygon = BuildRegularHexPolygon(DownOuterSide + 7.0f, center);
 		_conflictInner.Polygon = BuildRegularHexPolygon(DownOuterSide + 3.0f, center);
-		_conflictCore.Polygon = BuildRegularHexPolygon(DownInnerSide, center);
+		_conflictCore.Polygon = BuildRegularHexPolygon(downInnerSide, center);
 		_downOutline.Polygon = BuildRegularHexPolygon(DownOuterSide, center);
-		_downFill.Polygon = BuildRegularHexPolygon(DownInnerSide, center);
+		_downFill.Polygon = BuildRegularHexPolygon(downInnerSide, center);
 		_upOutline.Polygon = BuildRegularHexPolygon(UpOuterSide, center);
-		_upFill.Polygon = BuildRegularHexPolygon(UpInnerSide, center);
-		_downTextureClip.Polygon = BuildRegularHexPolygon(DownInnerSide, center);
-		_upTextureClip.Polygon = BuildRegularHexPolygon(UpInnerSide, center);
+		_upFill.Polygon = BuildRegularHexPolygon(upInnerSide, center);
+		_downTextureClip.Polygon = BuildRegularHexPolygon(downInnerSide, center);
+		_upTextureClip.Polygon = BuildRegularHexPolygon(upInnerSide, center);
 		_pathClipMask.Polygon = BuildRegularHexPolygon(DownOuterSide, center);
 
 		if (ConflictHighlight)
@@ -494,7 +502,7 @@ public partial class StackView : Node2D
 		_downTextureClip.Visible = showDownTexture;
 		if (showDownTexture)
 		{
-			ConfigureTextureSprite(_downTextureSprite, downTexture!, center, DownInnerSide);
+			ConfigureTextureSprite(_downTextureSprite, downTexture!, center, downInnerSide);
 		}
 
 		var showUp = HasUpTile;
@@ -505,7 +513,7 @@ public partial class StackView : Node2D
 		_upTextureClip.Visible = showUpTexture;
 		if (showUpTexture)
 		{
-			ConfigureTextureSprite(_upTextureSprite, upTexture!, center, UpInnerSide);
+			ConfigureTextureSprite(_upTextureSprite, upTexture!, center, upInnerSide);
 		}
 		else if (showUp)
 		{
@@ -569,18 +577,22 @@ public partial class StackView : Node2D
 				continue;
 			}
 
-			var anchor = GetEdgeAnchorPoint(edgeIndex, center, DownInnerSide, 0.7f);
+			var anchor = GetResourceEdgeAnchorPoint(edgeIndex, center);
 			var radial = (anchor - center).Normalized();
 			var tangent = new Vector2(-radial.Y, radial.X);
 			var count = Mathf.Min(resources.Count, 3);
-			var startOffset = -(count - 1) * 8.0f;
+			var startOffset = -(count - 1) * ResourceDotSpacing * 0.5f;
 
 			for (var i = 0; i < count; i++)
 			{
 				var circle = new Polygon2D
 				{
 					Color = ResolveResourceColor(resources[i]),
-					Polygon = BuildCirclePolygon(anchor + tangent * (startOffset + i * 16.0f), 6.5f, 16),
+					Polygon = BuildCirclePolygon(
+						anchor + tangent * (startOffset + i * ResourceDotSpacing),
+						ResourceDotRadius,
+						16
+					),
 				};
 				_resourceLayer.AddChild(circle);
 				_resourceNodes.Add(circle);
@@ -646,23 +658,14 @@ public partial class StackView : Node2D
 	{
 		var start = GetPathEdgePoint(edgeIndex, center);
 		var end = GetPathEdgePoint(targetEdgeIndex, center);
-		var distance = GetShortestEdgeDistance(edgeIndex, targetEdgeIndex);
-
-		return distance switch
+		var direction = end - start;
+		if (direction.LengthSquared() <= 0.0001f)
 		{
-			1 => BuildQuadraticPath(
-				start,
-				GetSharedCornerControl(edgeIndex, targetEdgeIndex, center),
-				end
-			),
-			2 => BuildQuadraticPath(
-				start,
-				GetDiagonalControl(edgeIndex, targetEdgeIndex, center),
-				end
-			),
-			3 => [start, end],
-			_ => [start, center, end],
-		};
+			return [start, end];
+		}
+
+		direction = direction.Normalized();
+		return [start - direction * PathEndpointExtension, end + direction * PathEndpointExtension];
 	}
 
 	private int? FindHoveredPathEdge(Vector2 localMousePosition)
@@ -832,6 +835,11 @@ public partial class StackView : Node2D
 		return new Vector2(sideLength * 2.0f, Mathf.Sqrt(3.0f) * sideLength);
 	}
 
+	private static float GetHexInnerSide(float outerSide)
+	{
+		return Mathf.Max(0.0f, outerSide - HexOutlineWidth);
+	}
+
 	private static Vector2[] BuildRegularHexPolygon(float sideLength, Vector2 center)
 	{
 		var halfHeight = Mathf.Sqrt(3.0f) * sideLength * 0.5f;
@@ -879,7 +887,14 @@ public partial class StackView : Node2D
 
 	private Vector2 GetPathEdgePoint(int edgeIndex, Vector2 center)
 	{
-		return GetEdgeAnchorPoint(edgeIndex, center, DownOuterSide, 1.08f);
+		return GetEdgeAnchorPoint(edgeIndex, center, DownOuterSide, 1.0f);
+	}
+
+	private Vector2 GetResourceEdgeAnchorPoint(int edgeIndex, Vector2 center)
+	{
+		var edgeMidpoint = GetEdgeAnchorPoint(edgeIndex, center, DownOuterSide, 1.0f);
+		var inward = (center - edgeMidpoint).Normalized();
+		return edgeMidpoint + inward * ResourceDotRadius;
 	}
 
 	private Vector2 GetSharedCornerControl(int edgeA, int edgeB, Vector2 center)
