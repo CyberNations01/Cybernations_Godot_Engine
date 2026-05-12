@@ -44,3 +44,4 @@ The server controler can be found at `file:///.../CyberNationsWithStructure/Serv
 ## Functions
 1. Hex-tiles hover lifting: change to inactivate.
     Use `private const bool StackHoverLiftEnabled = true;` to re-activate
+2. `pkill -f out/room-server` to kill the server.

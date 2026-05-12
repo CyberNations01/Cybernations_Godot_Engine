@@ -222,11 +222,16 @@ nlohmann::json GameState::toJson() const
         for (const auto& [from, to] : stack.getPaths()) {
             paths[std::to_string(t.stackSideToBoardSide(from))] = t.stackSideToBoardSide(to);
         }
+        nlohmann::json sides = nlohmann::json::array();
+        for (int side = 0; side < Tile::TILE_SIDES; ++side) {
+            sides.push_back(t.getSideResources(side));
+        }
         j["board"].push_back({
             {"position", t.getPosition()},
             {"type",     stackTypeToStr(t.getEffectiveType())},
             {"rotation", t.getRotation()},
-            {"paths",    paths}
+            {"paths",    paths},
+            {"sides",    sides}
         });
     }
 
