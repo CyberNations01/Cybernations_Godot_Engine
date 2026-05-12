@@ -147,6 +147,8 @@ public enum GameGatewayMode
 
 public partial class MainUI : Control
 {
+	private const bool StackHoverLiftEnabled = false;
+
 	private MainUiPresenter _presenter = null!;
 	private IGameGateway _gameGateway = null!;
 
@@ -396,7 +398,7 @@ private void RestorePopupBackground()
 		}
 
 		_popupWindowsVisible = hasVisiblePopup;
-		StackView.HoverEffectsEnabled = !_popupWindowsVisible;
+		StackView.HoverEffectsEnabled = StackHoverLiftEnabled && !_popupWindowsVisible;
 	}
 
 	private void UpdateBoardAccessibility()

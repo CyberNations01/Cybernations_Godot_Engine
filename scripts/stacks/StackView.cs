@@ -155,7 +155,7 @@ public partial class StackView : Node2D
 	private const float HexOutlineWidth = 7.0f;
 	private const float ResourceDotRadius = 6.5f;
 	private const float ResourceDotSpacing = ResourceDotRadius * 2.5f;
-	public static bool HoverEffectsEnabled { get; set; } = true;
+	public static bool HoverEffectsEnabled { get; set; } = false;
 	private Vector2[] _hoverPolygon = new Vector2[0];
 	private Vector2 _hoverCenter = Vector2.Zero;
 	private int _baseZIndex;

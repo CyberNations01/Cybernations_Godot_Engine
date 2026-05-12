@@ -37,3 +37,10 @@ The server controler can be found at `file:///.../CyberNationsWithStructure/Serv
 
 ## ADD
 1. Assets. Hex-tiles `Human`, `Tech`, `Waste`, `Wilds`.
+2. Assets. Path, Relation icons, background.
+
+# [2026/5/12 UPDATE]
+
+## Functions
+1. Hex-tiles hover lifting: change to inactivate.
+    Use `private const bool StackHoverLiftEnabled = true;` to re-activate
