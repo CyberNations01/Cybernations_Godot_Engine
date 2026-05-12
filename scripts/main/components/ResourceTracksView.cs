@@ -21,9 +21,9 @@ public partial class ResourceTracksView : Control, IResourceTracksView
 	private readonly Color _humanColor = Color.FromHtml("#C92CC1");
 	private readonly Color _technologyColor = Color.FromHtml("#3D29ED");
 	private readonly Color _environmentColor = Color.FromHtml("#6CE575");
-	private const string HumanRelationIconPath = "res://assets/Relation_Human.png";
-	private const string TechnologyRelationIconPath = "res://assets/Relation_Tech.png";
-	private const string EnvironmentRelationIconPath = "res://assets/Relation_Environment.png";
+	private const string HumanRelationIconPath = "res://assets/human_src.png";
+	private const string TechnologyRelationIconPath = "res://assets/tech_src.png";
+	private const string EnvironmentRelationIconPath = "res://assets/environment_src.png";
 	private readonly Dictionary<string, Texture2D?> _textureCache = [];
 
 	[Export]

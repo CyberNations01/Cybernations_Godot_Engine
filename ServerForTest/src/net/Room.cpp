@@ -28,15 +28,32 @@ void Room::onAction(int conn_id, Action action)
     // Bind action identity to the connection; clients cannot spoof playerId.
     action.playerId = it->second;
     auto result = gameRoom.receiveAction(action);
+    if (result.ok()) {
+        auto autoPassResult = applyAutoPassIfNeeded();
+        if (!autoPassResult.ok()) {
+            result = autoPassResult;
+        }
+    }
     if (result.ok())
         broadcast(gameRoom.getSnapshot());
 
     send(conn_id, serialize(result));
 }
 
+ActionResult Room::enableAutoPassForConnection(int conn_id)
+{
+    auto it = conn_map.find(conn_id);
+    if (it == conn_map.end())
+        return {ActionStatus::INVALID_ACTION, {"Room", "Unknown connection"}};
+
+    autoPassManualPlayerId = it->second;
+    return applyAutoPassIfNeeded();
+}
+
 void Room::startGame()
 {
     roomState = ROOM_STATE::PLAYING;
+    applyAutoPassIfNeeded();
     broadcast(gameRoom.getSnapshot());
 }
 
@@ -73,6 +90,14 @@ void Room::broadcast(const std::string &msg)
 void Room::send(int conn_id, const std::string &msg)
 {
     sendFunc(conn_id, msg);
+}
+
+ActionResult Room::applyAutoPassIfNeeded()
+{
+    if (roomState != ROOM_STATE::PLAYING || !autoPassManualPlayerId.has_value())
+        return ActionResult::success();
+
+    return gameRoom.autoPassUntilPlayer(autoPassManualPlayerId.value());
 }
 
 std::string Room::serialize(ActionResult result)

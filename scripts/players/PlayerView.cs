@@ -8,8 +8,6 @@ public partial class PlayerView : Control
 	private readonly Color _inkColor = Color.FromHtml("#2B2726");
 	private readonly Color _textColor = Color.FromHtml("#16222B");
 	private readonly Color _avatarFillColor = Color.FromHtml("#EAE6E0");
-	private readonly Color _passBubbleColor = Color.FromHtml("#D8D3CB");
-	private readonly Color _passTextColor = Color.FromHtml("#61F41E");
 
 	[Export]
 	public int Slot { get; set; } = 1;
@@ -23,8 +21,7 @@ public partial class PlayerView : Control
 	private Panel _avatarPanel = null!;
 	private Label _slotLabel = null!;
 	private Button _clickArea = null!;
-	private Panel _passBubble = null!;
-	private Label _passLabel = null!;
+	private TextureRect _passIcon = null!;
 	private Label _progressLabel = null!;
 
 	public override void _Ready()
@@ -34,15 +31,12 @@ public partial class PlayerView : Control
 		_avatarPanel = GetNode<Panel>("AvatarPanel");
 		_slotLabel = GetNode<Label>("SlotLabel");
 		_clickArea = GetNode<Button>("ClickArea");
-		_passBubble = GetNode<Panel>("PassBubble");
-		_passLabel = GetNode<Label>("PassBubble/PassLabel");
+		_passIcon = GetNode<TextureRect>("PassIcon");
 		_progressLabel = GetNode<Label>("ProgressLabel");
 
 		ApplyRoundedStyle(_avatarPanel, _avatarFillColor, 44, _inkColor, 2);
-		ApplyRoundedStyle(_passBubble, _passBubbleColor, 18);
 
 		_slotLabel.AddThemeColorOverride("font_color", _textColor);
-		_passLabel.AddThemeColorOverride("font_color", _passTextColor);
 		_progressLabel.AddThemeColorOverride("font_color", _textColor);
 
 		_clickArea.Pressed += () => EmitSignal(SignalName.PlayerSelected);
@@ -66,7 +60,7 @@ public partial class PlayerView : Control
 	{
 		_slotLabel.Text = $"P{Slot}";
 		_progressLabel.Text = Progress;
-		_passBubble.Visible = IsPassing;
+		_passIcon.Visible = IsPassing;
 	}
 
 	private static void ApplyRoundedStyle(

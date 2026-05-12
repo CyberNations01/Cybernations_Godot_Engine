@@ -310,6 +310,12 @@ public sealed class CybernationRestGameGateway : IGameGateway
 			return;
 		}
 
+		if (IsAutoPassCommand(payload.command))
+		{
+			await SendAutoPassCommandAsync(envelope, payload.command).ConfigureAwait(false);
+			return;
+		}
+
 		if (!TryBuildDevConsoleRequest(payload.command, out var request, out var error))
 		{
 			EmitDevConsoleResult(envelope, payload.command, false, 0, error);
@@ -335,6 +341,38 @@ public sealed class CybernationRestGameGateway : IGameGateway
 		catch (Exception ex)
 		{
 			EmitDevConsoleResult(envelope, payload.command, false, 0, $"Could not reach Cybernation REST server at {_baseUrl}: {ex.Message}");
+		}
+	}
+
+	private async Task SendAutoPassCommandAsync(PacketEnvelope envelope, string command)
+	{
+		if (string.IsNullOrWhiteSpace(_sessionId))
+		{
+			EmitDevConsoleResult(envelope, command, false, 0, "Join and start the room before using /auto pass.");
+			return;
+		}
+
+		try
+		{
+			var requestBody = JsonSerializer.Serialize(new Dictionary<string, object?>
+			{
+				["sessionId"] = _sessionId,
+			}, JsonOptions);
+			using var content = new StringContent(requestBody, Encoding.UTF8, "application/json");
+			using var response = await _client.PostAsync($"{_baseUrl}/auto-pass", content).ConfigureAwait(false);
+			var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+			var statusCode = (int)response.StatusCode;
+
+			if (response.IsSuccessStatusCode)
+			{
+				EmitTranslatedServerState(envelope, body, "Developer auto pass enabled.", 0);
+			}
+
+			EmitDevConsoleResult(envelope, command, response.IsSuccessStatusCode, statusCode, PrettyPrintJsonIfPossible(body));
+		}
+		catch (Exception ex)
+		{
+			EmitDevConsoleResult(envelope, command, false, 0, $"Could not reach Cybernation REST server at {_baseUrl}: {ex.Message}");
 		}
 	}
 
@@ -1154,6 +1192,11 @@ public sealed class CybernationRestGameGateway : IGameGateway
 		return normalized.Equals("/random simulation", StringComparison.OrdinalIgnoreCase)
 			|| normalized.Equals("/test path random simulation", StringComparison.OrdinalIgnoreCase)
 			|| normalized.Equals("/test path random generate", StringComparison.OrdinalIgnoreCase);
+	}
+
+	private static bool IsAutoPassCommand(string command)
+	{
+		return command.Trim().Equals("/auto pass", StringComparison.OrdinalIgnoreCase);
 	}
 
 	private const string BackendStackCatalogJson = """

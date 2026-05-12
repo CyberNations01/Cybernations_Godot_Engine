@@ -193,6 +193,40 @@ int main()
         res.set_content(response.dump(2), "application/json");
     });
 
+    server.Post("/auto-pass", [&](const httplib::Request& req, httplib::Response& res) {
+        json body = json::parse(req.body, nullptr, false);
+        if (body.is_discarded() || !body.contains("sessionId")) {
+            res.status = 400;
+            res.set_content(R"({"error":"missing sessionId"})", "application/json");
+            return;
+        }
+
+        const std::string sessionId = body.value("sessionId", "");
+        auto sessionIt = sessionToConn.find(sessionId);
+        if (sessionIt == sessionToConn.end()) {
+            res.status = 403;
+            res.set_content(R"({"error":"unknown sessionId"})", "application/json");
+            return;
+        }
+
+        const int connId = sessionIt->second;
+        const auto result = room.enableAutoPassForConnection(connId);
+        if (!result.ok()) {
+            res.status = 400;
+        }
+
+        json response = {
+            {"sessionId", sessionId},
+            {"connId", connId},
+            {"playerId", room.getPlayerIdForConnection(connId)},
+            {"roomState", roomStateToStr(room.getRoomState())},
+            {"autoPass", result.ok()},
+            {"messages", drainMessages(outbox, connId)}
+        };
+        response["snapshot"] = normalizedSnapshot(room);
+        res.set_content(response.dump(2), "application/json");
+    });
+
     server.Get("/messages", [&](const httplib::Request& req, httplib::Response& res) {
         if (!req.has_param("sessionId")) {
             res.status = 400;

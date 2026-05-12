@@ -335,6 +335,10 @@ nlohmann::json RoundController::toJson() const
     j["phase"] = gamePhaseToStr(currentPhase);
     j["gameOver"] = gameOver;
     j["next_player_id"] = currentPlayerId;
+    j["passedPlayers"] = nlohmann::json::array();
+    for (const auto& playerId : passedPlayers) {
+        j["passedPlayers"].push_back(playerId);
+    }
     j["allowed_actions"] = allowedActions;
     j["recommended_action"] = recommendedAction;
     j["traverse_stage"] = traverse_record.stage;

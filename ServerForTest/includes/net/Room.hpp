@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <map>
+#include <optional>
 #include <string>
 
 #include "game/GameRoom.hpp"
@@ -23,6 +24,7 @@ public:
 
     void joinPlayer(int conn_id);
     void onAction(int conn_id, Action action);
+    ActionResult enableAutoPassForConnection(int conn_id);
     void removePlayer(int conn_id);
     void startGame();
     std::string getSnapshot() const;
@@ -38,8 +40,10 @@ private:
     GameRoom    gameRoom;
     int nextPlayerId = 0;
     std::map<int,int> conn_map;
+    std::optional<int> autoPassManualPlayerId;
     std::function<void(int conn_id, std::string msg)> sendFunc;
     std::string serialize(ActionResult result);
+    ActionResult applyAutoPassIfNeeded();
 };
 
 #endif

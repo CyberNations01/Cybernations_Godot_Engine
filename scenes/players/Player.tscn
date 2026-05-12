@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/players/PlayerView.cs" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/Pass.png" id="2_pass"]
 
 [node name="Player" type="Control"]
 custom_minimum_size = Vector2(180, 122)
@@ -30,20 +31,14 @@ flat = true
 text = ""
 modulate = Color(1, 1, 1, 0)
 
-[node name="PassBubble" type="Panel" parent="."]
+[node name="PassIcon" type="TextureRect" parent="."]
 offset_left = 96.0
-offset_top = 2.0
-offset_right = 172.0
-offset_bottom = 42.0
-
-[node name="PassLabel" type="Label" parent="PassBubble"]
-offset_top = 8.0
-offset_right = 76.0
-offset_bottom = 30.0
-theme_override_font_sizes/font_size = 16
-horizontal_alignment = 1
-vertical_alignment = 1
-text = "PASS"
+offset_top = 18.0
+offset_right = 156.0
+offset_bottom = 78.0
+texture = ExtResource("2_pass")
+expand_mode = 1
+stretch_mode = 5
 
 [node name="ProgressLabel" type="Label" parent="."]
 offset_top = 92.0

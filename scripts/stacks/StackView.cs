@@ -116,6 +116,10 @@ public partial class StackView : Node2D
 	private const string HumanTexturePath = "res://assets/Human.png";
 	private const string TechnologyTexturePath = "res://assets/Tech.png";
 	private const string GeneratedPathTexturePath = "res://assets/path.png";
+	private const string HumanRelationIconPath = "res://assets/human_src.png";
+	private const string TechnologyRelationIconPath = "res://assets/tech_src.png";
+	private const string EnvironmentRelationIconPath = "res://assets/environment_src.png";
+	private const string ConflictRelationIconPath = "res://assets/conflict.png";
 
 	private Polygon2D _conflictOuter = null!;
 	private Polygon2D _conflictInner = null!;
@@ -135,6 +139,7 @@ public partial class StackView : Node2D
 	private readonly Texture2D?[] _defaultRelationTextures = new Texture2D?[6];
 	private readonly Texture2D?[] _defaultPathTextures = new Texture2D?[6];
 	private readonly Dictionary<TileKind, Texture2D?> _tileTextureCache = [];
+	private readonly Dictionary<string, Texture2D?> _resourceTextureCache = [];
 	private Texture2D? _generatedPathTexture;
 	private bool _generatedPathTextureLoaded;
 	private readonly float[] _defaultPathRotations = new float[6];
@@ -155,6 +160,7 @@ public partial class StackView : Node2D
 	private const float HexOutlineWidth = 7.0f;
 	private const float ResourceDotRadius = 6.5f;
 	private const float ResourceDotSpacing = ResourceDotRadius * 2.5f;
+	private const float ResourceIconSize = ResourceDotRadius * 2.7f;
 	public static bool HoverEffectsEnabled { get; set; } = false;
 	private Vector2[] _hoverPolygon = new Vector2[0];
 	private Vector2 _hoverCenter = Vector2.Zero;
@@ -588,17 +594,10 @@ public partial class StackView : Node2D
 
 			for (var i = 0; i < count; i++)
 			{
-				var circle = new Polygon2D
-				{
-					Color = ResolveResourceColor(resources[i]),
-					Polygon = BuildCirclePolygon(
-						anchor + tangent * (startOffset + i * ResourceDotSpacing),
-						ResourceDotRadius,
-						16
-					),
-				};
-				_resourceLayer.AddChild(circle);
-				_resourceNodes.Add(circle);
+				var resourcePosition = anchor + tangent * (startOffset + i * ResourceDotSpacing);
+				var resourceNode = CreateResourceVisual(resources[i], resourcePosition);
+				_resourceLayer.AddChild(resourceNode);
+				_resourceNodes.Add(resourceNode);
 			}
 		}
 	}
@@ -748,6 +747,67 @@ public partial class StackView : Node2D
 			BoardResourceKind.Conflict => _resourceConflictColor,
 			_ => Colors.White,
 		};
+	}
+
+	private Node2D CreateResourceVisual(BoardResourceKind kind, Vector2 position)
+	{
+		var texture = ResolveResourceTexture(kind);
+		if (texture != null)
+		{
+			var sprite = new Sprite2D
+			{
+				Texture = texture,
+				Position = position,
+				Centered = true,
+			};
+
+			var textureSize = texture.GetSize();
+			if (textureSize.X > 0.0f && textureSize.Y > 0.0f)
+			{
+				var scale = ResourceIconSize / Mathf.Max(textureSize.X, textureSize.Y);
+				sprite.Scale = new Vector2(scale, scale);
+			}
+
+			return sprite;
+		}
+
+		return new Polygon2D
+		{
+			Color = ResolveResourceColor(kind),
+			Polygon = BuildCirclePolygon(position, ResourceDotRadius, 16),
+		};
+	}
+
+	private Texture2D? ResolveResourceTexture(BoardResourceKind kind)
+	{
+		var path = kind switch
+		{
+			BoardResourceKind.Human => HumanRelationIconPath,
+			BoardResourceKind.Technology => TechnologyRelationIconPath,
+			BoardResourceKind.Environment => EnvironmentRelationIconPath,
+			BoardResourceKind.Conflict => ConflictRelationIconPath,
+			_ => "",
+		};
+
+		if (path.Length == 0)
+		{
+			return null;
+		}
+
+		if (_resourceTextureCache.TryGetValue(path, out var cachedTexture))
+		{
+			return cachedTexture;
+		}
+
+		if (!ResourceLoader.Exists(path))
+		{
+			_resourceTextureCache[path] = null;
+			return null;
+		}
+
+		var texture = GD.Load<Texture2D>(path);
+		_resourceTextureCache[path] = texture;
+		return texture;
 	}
 
 	private static void ClearNodeList(List<Node> nodes)

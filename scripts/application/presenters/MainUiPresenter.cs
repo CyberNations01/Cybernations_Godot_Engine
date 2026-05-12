@@ -777,7 +777,7 @@ public sealed class MainUiPresenter : IDisposable
 			_chatPanelView.AddMessage(
 				new ChatMessageVm(
 					"DEV",
-					"Developer mode activated. Enter REST commands like GET /state, /random simulation, or /test path random simulation. Use /dev deactivate to exit."
+					"Developer mode activated. Enter REST commands like GET /state, /auto pass, /random simulation, or /test path random simulation. Use /dev deactivate to exit."
 				)
 			);
 			return true;

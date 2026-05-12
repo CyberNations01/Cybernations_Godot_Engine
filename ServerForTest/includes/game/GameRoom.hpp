@@ -34,6 +34,7 @@ public:
     
     // Process a player action. Returns what happened.
     ActionResult receiveAction(const Action& action);
+    ActionResult autoPassUntilPlayer(int manualPlayerId);
 
     std::string getSnapshot() const;
     std::string getControllerSnapshot() const;
