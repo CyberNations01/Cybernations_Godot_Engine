@@ -1,7 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://dxudeeajv1lt0"]
+[gd_scene format=3 uid="uid://dxudeeajv1lt0"]
 
 [ext_resource type="Script" uid="uid://skhsps5q0fnf" path="res://scripts/main/MainUI.cs" id="1_script"]
-[ext_resource type="Texture2D" path="res://assets/background.png" id="2_background"]
+[ext_resource type="Texture2D" uid="uid://rcjrwu4f754g" path="res://assets/background.png" id="2_background"]
 [ext_resource type="PackedScene" path="res://scenes/main/components/HiveBoard.tscn" id="2_grv7h"]
 [ext_resource type="PackedScene" path="res://scenes/main/components/NationLevelBadge.tscn" id="2_nation"]
 [ext_resource type="PackedScene" path="res://scenes/main/components/TurnDots.tscn" id="3_turn"]
@@ -24,7 +24,7 @@
 [ext_resource type="PackedScene" uid="uid://bhdlqf462da0b" path="res://scenes/Envison Phase/StatusBanner.tscn" id="19_ftc2p"]
 [ext_resource type="Script" uid="uid://cxmu7y1wveyx6" path="res://scripts/Envision Phase/FeedbackTokenPopup.cs" id="19_roob6"]
 [ext_resource type="PackedScene" uid="uid://ba05ikbew35bn" path="res://scenes/Envison Phase/FeedbackTrackManipulationPopup.tscn" id="21_roob6"]
-[ext_resource type="Script" path="res://scripts/main/components/GameStartOverlayView.cs" id="22_start_overlay"]
+[ext_resource type="Script" uid="uid://pnn12m4trtmx" path="res://scripts/main/components/GameStartOverlayView.cs" id="22_start_overlay"]
 
 [node name="Main" type="Control" unique_id=786545785]
 layout_mode = 3
@@ -113,7 +113,7 @@ offset_top = 424.0
 offset_right = 1845.0
 offset_bottom = 644.0
 
-[node name="FeedbackTrack" parent="UIMain" instance=ExtResource("6_feedback")]
+[node name="FeedbackTrack" parent="UIMain" unique_id=1757863947 instance=ExtResource("6_feedback")]
 anchors_preset = 0
 offset_left = 1345.0
 offset_top = 655.0
@@ -198,7 +198,6 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 0
 script = ExtResource("22_start_overlay")
 
 [node name="ColorblindToggleButton" type="Button" parent="UIMain" unique_id=73986387]

@@ -316,6 +316,12 @@ public sealed class CybernationRestGameGateway : IGameGateway
 			return;
 		}
 
+		if (IsNextCommand(payload.command))
+		{
+			await SendNextCommandAsync(envelope, payload.command).ConfigureAwait(false);
+			return;
+		}
+
 		if (!TryBuildDevConsoleRequest(payload.command, out var request, out var error))
 		{
 			EmitDevConsoleResult(envelope, payload.command, false, 0, error);
@@ -374,6 +380,236 @@ public sealed class CybernationRestGameGateway : IGameGateway
 		{
 			EmitDevConsoleResult(envelope, command, false, 0, $"Could not reach Cybernation REST server at {_baseUrl}: {ex.Message}");
 		}
+	}
+
+	private async Task SendNextCommandAsync(PacketEnvelope envelope, string command)
+	{
+		if (string.IsNullOrWhiteSpace(_sessionId))
+		{
+			EmitDevConsoleResult(envelope, command, false, 0, "Join and start the room before using /next.");
+			return;
+		}
+
+		try
+		{
+			var stateAttempt = await FetchSessionStateAsync().ConfigureAwait(false);
+			if (!stateAttempt.HttpSuccess)
+			{
+				EmitDevConsoleResult(
+					envelope,
+					command,
+					false,
+					stateAttempt.HttpStatusCode,
+					$"Could not query room state before /next.\n\n{PrettyPrintJsonIfPossible(stateAttempt.Body)}"
+				);
+				return;
+			}
+
+			var nextAction = TryDetermineNextAction(stateAttempt.Body, out var beforeHint);
+			if (string.IsNullOrWhiteSpace(nextAction))
+			{
+				EmitTranslatedServerState(envelope, stateAttempt.Body, $"Developer /next could not determine an action. {beforeHint}", 0);
+				EmitDevConsoleResult(
+					envelope,
+					command,
+					false,
+					stateAttempt.HttpStatusCode,
+					$"Could not determine next action from server controller.\n{beforeHint}\n\n{PrettyPrintJsonIfPossible(stateAttempt.Body)}"
+				);
+				return;
+			}
+
+			var actionAttempt = await SendDevActionAsync(nextAction).ConfigureAwait(false);
+			if (actionAttempt.HttpSuccess && actionAttempt.ActionStatus == 0)
+			{
+				EmitTranslatedServerState(envelope, actionAttempt.Body, $"Developer /next executed '{nextAction}'.", 0);
+				EmitDevConsoleResult(
+					envelope,
+					command,
+					true,
+					actionAttempt.HttpStatusCode,
+					PrettyPrintJsonIfPossible(actionAttempt.Body)
+				);
+				return;
+			}
+
+			var afterHint = TryBuildControllerHintFromServerJson(actionAttempt.Body);
+			if (actionAttempt.HttpSuccess && !string.IsNullOrWhiteSpace(actionAttempt.Body))
+			{
+				EmitTranslatedServerState(envelope, actionAttempt.Body, $"Developer /next failed on '{nextAction}'. {afterHint}", 0);
+			}
+
+			var diagnosticBody = $"Attempted action: {nextAction}\nBefore: {beforeHint}\nAfter: {afterHint}\n\n"
+				+ PrettyPrintJsonIfPossible(actionAttempt.Body);
+			EmitDevConsoleResult(
+				envelope,
+				command,
+				false,
+				actionAttempt.HttpStatusCode,
+				diagnosticBody
+			);
+		}
+		catch (Exception ex)
+		{
+			EmitDevConsoleResult(envelope, command, false, 0, $"Could not reach Cybernation REST server at {_baseUrl}: {ex.Message}");
+		}
+	}
+
+	private async Task<(bool HttpSuccess, int HttpStatusCode, string Body)> FetchSessionStateAsync()
+	{
+		using var response = await _client.GetAsync($"{_baseUrl}/messages?sessionId={Uri.EscapeDataString(_sessionId!)}").ConfigureAwait(false);
+		var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+		return (response.IsSuccessStatusCode, (int)response.StatusCode, body);
+	}
+
+	private async Task<(bool HttpSuccess, int HttpStatusCode, int ActionStatus, string Body)> SendDevActionAsync(string actionType)
+	{
+		var requestBody = JsonSerializer.Serialize(new Dictionary<string, object?>
+		{
+			["sessionId"] = _sessionId,
+			["type"] = actionType,
+		}, JsonOptions);
+		using var content = new StringContent(requestBody, Encoding.UTF8, "application/json");
+		using var response = await _client.PostAsync($"{_baseUrl}/action", content).ConfigureAwait(false);
+		var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+		var actionStatus = 1;
+
+		if (response.IsSuccessStatusCode)
+		{
+			try
+			{
+				using var document = JsonDocument.Parse(body);
+				actionStatus = GetActionStatus(document.RootElement, 1);
+			}
+			catch
+			{
+				actionStatus = 1;
+			}
+		}
+
+		return (response.IsSuccessStatusCode, (int)response.StatusCode, actionStatus, body);
+	}
+
+	private static string TryDetermineNextAction(string serverJson, out string controllerHint)
+	{
+		controllerHint = "controller: unavailable";
+		if (string.IsNullOrWhiteSpace(serverJson))
+		{
+			return "";
+		}
+
+		try
+		{
+			using var document = JsonDocument.Parse(serverJson);
+			var root = document.RootElement;
+			if (!TryGetControllerFromServerJson(root, out var controller))
+			{
+				return "";
+			}
+
+			var phase = GetString(controller, "phase", "UNKNOWN");
+			var round = GetInt(controller, "round", 0);
+			var nextPlayerId = GetIntAny(controller, -1, "next_player_id", "current_player_id", "currentPlayerId");
+			var traverseStage = GetInt(controller, "traverse_stage", -1);
+			var recommended = GetStringAny(controller, "", "recommended_action", "recommendedAction");
+			var allowed = GetStringArray(controller, "allowed_actions") ?? [];
+
+			controllerHint =
+				$"phase={phase}, round={round}, next_player={nextPlayerId}, traverse_stage={traverseStage}, " +
+				$"recommended={recommended}, allowed=[{string.Join(", ", allowed)}]";
+
+			if (!string.IsNullOrWhiteSpace(recommended) && ContainsAction(allowed, recommended))
+			{
+				return recommended;
+			}
+
+			string[] priorities =
+			[
+				"draw_disruption",
+				"walk_path",
+				"resolve_feedback",
+				"resolve_disruption",
+				"pass",
+				"advance"
+			];
+
+			foreach (var candidate in priorities)
+			{
+				if (ContainsAction(allowed, candidate))
+				{
+					return candidate;
+				}
+			}
+
+			return allowed.Length > 0 ? allowed[0] : "";
+		}
+		catch
+		{
+			return "";
+		}
+	}
+
+	private static string TryBuildControllerHintFromServerJson(string serverJson)
+	{
+		if (string.IsNullOrWhiteSpace(serverJson))
+		{
+			return "controller: unavailable";
+		}
+
+		try
+		{
+			using var document = JsonDocument.Parse(serverJson);
+			var root = document.RootElement;
+			if (!TryGetControllerFromServerJson(root, out var controller))
+			{
+				return "controller: unavailable";
+			}
+
+			var phase = GetString(controller, "phase", "UNKNOWN");
+			var round = GetInt(controller, "round", 0);
+			var nextPlayerId = GetIntAny(controller, -1, "next_player_id", "current_player_id", "currentPlayerId");
+			var traverseStage = GetInt(controller, "traverse_stage", -1);
+			var recommended = GetStringAny(controller, "", "recommended_action", "recommendedAction");
+			var allowed = GetStringArray(controller, "allowed_actions") ?? [];
+
+			return
+				$"phase={phase}, round={round}, next_player={nextPlayerId}, traverse_stage={traverseStage}, " +
+				$"recommended={recommended}, allowed=[{string.Join(", ", allowed)}]";
+		}
+		catch
+		{
+			return "controller: unavailable";
+		}
+	}
+
+	private static bool TryGetControllerFromServerJson(JsonElement root, out JsonElement controller)
+	{
+		var snapshotRoot = root.TryGetProperty("snapshot", out var snapshotElement)
+			&& snapshotElement.ValueKind == JsonValueKind.Object
+				? snapshotElement
+				: root;
+
+		if (snapshotRoot.TryGetProperty("controller", out controller)
+			&& controller.ValueKind == JsonValueKind.Object)
+		{
+			return true;
+		}
+
+		controller = default;
+		return false;
+	}
+
+	private static bool ContainsAction(string[] actions, string action)
+	{
+		for (var i = 0; i < actions.Length; i++)
+		{
+			if (string.Equals(actions[i], action, StringComparison.OrdinalIgnoreCase))
+			{
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	private async Task SendEnvisionActionAsync(PacketEnvelope envelope)
@@ -1197,6 +1433,11 @@ public sealed class CybernationRestGameGateway : IGameGateway
 	private static bool IsAutoPassCommand(string command)
 	{
 		return command.Trim().Equals("/auto pass", StringComparison.OrdinalIgnoreCase);
+	}
+
+	private static bool IsNextCommand(string command)
+	{
+		return command.Trim().Equals("/next", StringComparison.OrdinalIgnoreCase);
 	}
 
 	private const string BackendStackCatalogJson = """

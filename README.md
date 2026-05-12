@@ -16,6 +16,7 @@ Entrance: `GET /state`, `POST /test/action`.
 5. A test command `/random simulation` is added into dev mode. It runs without the server but simulates the Json feedback and update frontend layouts with it.
 6. In dev mode, use `/test path random simulation` to get into path choosing and relations gain simulation. Use `/test path random generate` to randomly generate 11 hex-tiles from universe set of all hex-tiles.
 7. In dev mode, use `/auto pass` to make all non-local players automatically pass during Envision until the local player is active again.
+8. In dev mode, use `/next` to auto-pick and send the current allowed action from server state (with phase/allowed-action diagnostics) when the flow appears stuck and no action popup is available.
 
 
 # [2026/5/5 UPDATE 2]
@@ -39,6 +40,8 @@ The server controler can be found at `file:///.../CyberNationsWithStructure/Serv
 ## ADD
 1. Assets. Hex-tiles `Human`, `Tech`, `Waste`, `Wilds`.
 2. Assets. Path, Relation icons, background.
+3. `/pass` in dev mode to escape from stucks.
+
 
 # [2026/5/12 UPDATE]
 
@@ -50,3 +53,4 @@ The server controler can be found at `file:///.../CyberNationsWithStructure/Serv
 
 ## Fix
 1. Backend Json didn't output the relations at the edges. Now it will.
+2. After `/auto pass` the game process enters `TRAVERSE` and the permited only action is `draw_disruption/resolve_disruption/...`, so that the game stucks here. We've updated the `/next` command not just trying `pass/advance` but force pushing to the next allowed action.
