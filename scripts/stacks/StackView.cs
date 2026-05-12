@@ -115,6 +115,7 @@ public partial class StackView : Node2D
 	private const string WastedTexturePath = "res://assets/Waste.png";
 	private const string HumanTexturePath = "res://assets/Human.png";
 	private const string TechnologyTexturePath = "res://assets/Tech.png";
+	private const string GeneratedPathTexturePath = "res://assets/path.png";
 
 	private Polygon2D _conflictOuter = null!;
 	private Polygon2D _conflictInner = null!;
@@ -134,6 +135,8 @@ public partial class StackView : Node2D
 	private readonly Texture2D?[] _defaultRelationTextures = new Texture2D?[6];
 	private readonly Texture2D?[] _defaultPathTextures = new Texture2D?[6];
 	private readonly Dictionary<TileKind, Texture2D?> _tileTextureCache = [];
+	private Texture2D? _generatedPathTexture;
+	private bool _generatedPathTextureLoaded;
 	private readonly float[] _defaultPathRotations = new float[6];
 	private readonly EdgeState[] _edgeStates = new EdgeState[6];
 	private Polygon2D _pathClipMask = null!;
@@ -148,6 +151,7 @@ public partial class StackView : Node2D
 	private const float PathFillWidth = 6.0f;
 	private const float PathOutlineWidth = 12.0f;
 	private const float PathEndpointExtension = 16.0f;
+	private const float PathTextureWidth = PathOutlineWidth;
 	private const float HexOutlineWidth = 7.0f;
 	private const float ResourceDotRadius = 6.5f;
 	private const float ResourceDotSpacing = ResourceDotRadius * 2.5f;
@@ -560,8 +564,7 @@ public partial class StackView : Node2D
 			}
 
 			var points = BuildPathPolyline(edgeIndex, targetEdge.Value, center);
-			AddPathLine(points, _pathOutlineColor, PathOutlineWidth);
-			AddPathLine(points, _pathColor, PathFillWidth);
+			AddPathVisual(points);
 		}
 	}
 
@@ -654,6 +657,47 @@ public partial class StackView : Node2D
 		_generatedPathNodes.Add(line);
 	}
 
+	private void AddPathVisual(Vector2[] points)
+	{
+		if (points.Length < 2)
+		{
+			return;
+		}
+
+		var texture = ResolveGeneratedPathTexture();
+		if (texture == null)
+		{
+			AddPathLine(points, _pathOutlineColor, PathOutlineWidth);
+			AddPathLine(points, _pathColor, PathFillWidth);
+			return;
+		}
+
+		AddPathSprite(points[0], points[^1], texture);
+	}
+
+	private void AddPathSprite(Vector2 start, Vector2 end, Texture2D texture)
+	{
+		var direction = end - start;
+		var length = direction.Length();
+		var textureSize = texture.GetSize();
+		if (length <= 0.0001f || textureSize.X <= 0.0f || textureSize.Y <= 0.0f)
+		{
+			return;
+		}
+
+		var sprite = new Sprite2D
+		{
+			Texture = texture,
+			Centered = true,
+			Position = (start + end) * 0.5f,
+			Rotation = direction.Angle() - Mathf.Pi * 0.5f,
+			Scale = new Vector2(PathTextureWidth / textureSize.X, length / textureSize.Y),
+		};
+
+		_generatedPathLayer.AddChild(sprite);
+		_generatedPathNodes.Add(sprite);
+	}
+
 	private Vector2[] BuildPathPolyline(int edgeIndex, int targetEdgeIndex, Vector2 center)
 	{
 		var start = GetPathEdgePoint(edgeIndex, center);
@@ -732,6 +776,23 @@ public partial class StackView : Node2D
 			TileKind.Technology => TechnologyTexture ?? LoadTileTexture(tileKind, TechnologyTexturePath),
 			_ => null,
 		};
+	}
+
+	private Texture2D? ResolveGeneratedPathTexture()
+	{
+		if (_generatedPathTextureLoaded)
+		{
+			return _generatedPathTexture;
+		}
+
+		_generatedPathTextureLoaded = true;
+		if (!ResourceLoader.Exists(GeneratedPathTexturePath))
+		{
+			return null;
+		}
+
+		_generatedPathTexture = GD.Load<Texture2D>(GeneratedPathTexturePath);
+		return _generatedPathTexture;
 	}
 
 	private Texture2D? LoadTileTexture(TileKind tileKind, string path)
