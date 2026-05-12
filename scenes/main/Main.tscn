@@ -8,6 +8,7 @@
 [ext_resource type="PackedScene" path="res://scenes/main/components/PlayerPanel.tscn" id="3_yub1f"]
 [ext_resource type="PackedScene" path="res://scenes/main/components/ResourceTracks.tscn" id="4_tracks"]
 [ext_resource type="PackedScene" path="res://scenes/main/components/TeamGoalPanel.tscn" id="5_team_goal"]
+[ext_resource type="PackedScene" path="res://scenes/main/components/FeedbackTrack.tscn" id="6_feedback"]
 [ext_resource type="PackedScene" path="res://scenes/main/components/InfoSummaryPanel.tscn" id="6_info"]
 [ext_resource type="PackedScene" path="res://scenes/main/components/ChatPanel.tscn" id="7_chat"]
 [ext_resource type="PackedScene" path="res://scenes/main/components/PlayerDetailPopup.tscn" id="8_popup"]
@@ -74,9 +75,9 @@ offset_bottom = 40.0
 
 [node name="NationLevelBadge" parent="UIMain" unique_id=1569355162 instance=ExtResource("2_nation")]
 anchors_preset = 0
-offset_left = 92.0
+offset_left = 78.0
 offset_top = 784.0
-offset_right = 204.0
+offset_right = 218.0
 offset_bottom = 924.0
 
 [node name="TurnDots" parent="UIMain" unique_id=2062547061 instance=ExtResource("3_turn")]
@@ -108,9 +109,16 @@ mouse_filter = 2
 [node name="InfoSummaryPanel" parent="UIMain" unique_id=1551659619 instance=ExtResource("6_info")]
 anchors_preset = 0
 offset_left = 1345.0
-offset_top = 296.0
+offset_top = 424.0
 offset_right = 1845.0
-offset_bottom = 588.0
+offset_bottom = 644.0
+
+[node name="FeedbackTrack" parent="UIMain" instance=ExtResource("6_feedback")]
+anchors_preset = 0
+offset_left = 1345.0
+offset_top = 655.0
+offset_right = 1845.0
+offset_bottom = 711.0
 
 [node name="ChatPanel" parent="UIMain" unique_id=1533829034 instance=ExtResource("7_chat")]
 layout_mode = 1
@@ -119,10 +127,10 @@ anchor_left = 1.0
 anchor_top = 0.5
 anchor_right = 1.0
 anchor_bottom = 0.5
-offset_left = -572.0
-offset_top = 60.0
-offset_right = -572.0
-offset_bottom = 60.0
+offset_left = -575.0
+offset_top = 174.0
+offset_right = -575.0
+offset_bottom = 174.0
 grow_horizontal = 0
 grow_vertical = 2
 mouse_filter = 2

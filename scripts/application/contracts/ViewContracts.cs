@@ -95,6 +95,8 @@ public interface ITeamGoalPanelView : IPopupHostAwareView
 	bool IsDropdownVisible { get; }
 	void SetDropdownVisible(bool visible);
 	void SetPreview(string title, string description);
+	void SetGoalConflictTiles(IReadOnlyList<int> tileIndices);
+	void SetHiveGridSnapshot(IReadOnlyList<BoardTileVm> tiles);
 }
 
 public interface IInfoSummaryPanelView : IPopupHostAwareView
@@ -118,6 +120,11 @@ public interface IHiveBoardView
 public interface IResourceTracksView
 {
 	void SetResources(int human, int technology, int environment, int conflict);
+}
+
+public interface IFeedbackTrackView
+{
+	void SetTokens(IReadOnlyList<string> tokens, int cursor);
 }
 
 public interface INationLevelBadgeView

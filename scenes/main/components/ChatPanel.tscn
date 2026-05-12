@@ -7,7 +7,7 @@ script = ExtResource("1_script")
 
 [node name="ChatLogPanel" type="Panel" parent="."]
 offset_right = 500.0
-offset_bottom = 350.0
+offset_bottom = 260.0
 clip_contents = true
 
 [node name="ChatTitleLabel" type="Label" parent="ChatLogPanel"]
@@ -24,7 +24,7 @@ text = "Chat Log"
 offset_left = 18.0
 offset_top = 52.0
 offset_right = 482.0
-offset_bottom = 332.0
+offset_bottom = 242.0
 theme_override_font_sizes/font_size = 14
 horizontal_alignment = 0
 vertical_alignment = 0
@@ -32,7 +32,7 @@ autowrap_mode = 3
 
 [node name="ChatLogHitArea" type="Button" parent="."]
 offset_right = 500.0
-offset_bottom = 350.0
+offset_bottom = 260.0
 focus_mode = 0
 mouse_default_cursor_shape = 2
 flat = true
@@ -40,13 +40,13 @@ text = ""
 modulate = Color(1, 1, 1, 0)
 
 [node name="ChatInputPanel" type="Panel" parent="."]
-offset_top = 368.0
+offset_top = 278.0
 offset_right = 500.0
-offset_bottom = 424.0
+offset_bottom = 334.0
 
 [node name="ChatInputLineEdit" type="LineEdit" parent="."]
 offset_left = 18.0
-offset_top = 381.0
+offset_top = 291.0
 offset_right = 482.0
-offset_bottom = 411.0
+offset_bottom = 321.0
 placeholder_text = "Type a message..."

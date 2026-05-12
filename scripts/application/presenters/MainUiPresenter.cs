@@ -13,6 +13,7 @@ public sealed class MainUiPresenter : IDisposable
 	private readonly IInfoSummaryPanelView _infoSummaryPanelView;
 	private readonly IHiveBoardView _hiveBoardView;
 	private readonly IResourceTracksView _resourceTracksView;
+	private readonly IFeedbackTrackView _feedbackTrackView;
 	private readonly INationLevelBadgeView _nationLevelBadgeView;
 	private readonly ITurnDotsView _turnDotsView;
 	private readonly IPlayerPanelView _playerPanelView;
@@ -41,6 +42,7 @@ public sealed class MainUiPresenter : IDisposable
 		IInfoSummaryPanelView infoSummaryPanelView,
 		IHiveBoardView hiveBoardView,
 		IResourceTracksView resourceTracksView,
+		IFeedbackTrackView feedbackTrackView,
 		INationLevelBadgeView nationLevelBadgeView,
 		ITurnDotsView turnDotsView,
 		IPlayerPanelView playerPanelView,
@@ -55,6 +57,7 @@ public sealed class MainUiPresenter : IDisposable
 		_infoSummaryPanelView = infoSummaryPanelView;
 		_hiveBoardView = hiveBoardView;
 		_resourceTracksView = resourceTracksView;
+		_feedbackTrackView = feedbackTrackView;
 		_nationLevelBadgeView = nationLevelBadgeView;
 		_turnDotsView = turnDotsView;
 		_playerPanelView = playerPanelView;
@@ -355,6 +358,7 @@ public sealed class MainUiPresenter : IDisposable
 			var teamGoal = payload.team_goal.Value;
 			_cachedTeamGoalState = teamGoal;
 			_teamGoalPanelView.SetPreview(teamGoal.title, teamGoal.description);
+			_teamGoalPanelView.SetGoalConflictTiles(teamGoal.conflict_tile_indices ?? Array.Empty<int>());
 		}
 
 		if (payload.info_summary.HasValue)
@@ -414,6 +418,7 @@ public sealed class MainUiPresenter : IDisposable
 
 		_cachedTeamGoalState = payload;
 		_teamGoalPanelView.SetPreview(payload.title, payload.description);
+		_teamGoalPanelView.SetGoalConflictTiles(payload.conflict_tile_indices ?? Array.Empty<int>());
 		if (_teamGoalDetailOpenPending)
 		{
 			_teamGoalPanelView.SetDropdownVisible(true);
@@ -494,6 +499,7 @@ public sealed class MainUiPresenter : IDisposable
 			_nationLevelBadgeView.SetLevel(resourcePlayer.Cybernation);
 		}
 		_turnDotsView.SetCompletedTurns(payload.completed_rounds);
+		_feedbackTrackView.SetTokens(payload.feedback_track ?? Array.Empty<string>(), payload.feedback_cursor);
 		_playerPanelView.SetPlayers(BuildPlayerPanelPlayers(players));
 
 		_envisionController.ApplyState(
@@ -615,6 +621,7 @@ public sealed class MainUiPresenter : IDisposable
 		}
 
 		_hiveBoardView.ApplyTiles(tiles);
+		_teamGoalPanelView.SetHiveGridSnapshot(tiles);
 	}
 
 	private static BoardResourceKind[] ParseBoardResources(string[]? resources)

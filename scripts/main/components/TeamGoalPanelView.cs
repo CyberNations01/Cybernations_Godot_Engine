@@ -28,25 +28,27 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 	private int _dropdownOriginalIndex;
 	private Vector2 _dropdownLocalPosition = Vector2.Zero;
 	private readonly Dictionary<string, Texture2D?> _hexTextureCache = [];
+	private readonly HashSet<int> _goalConflictTileIndices = [];
+	private List<HexTileData> _snapshotTiles = [];
 
 	public event Action? ToggleRequested;
 	public event Action? CloseRequested;
 
 	public bool IsDropdownVisible => _dropdownPanel != null && _dropdownPanel.Visible;
 
-	private readonly HexTileData[] _hexTiles =
+	private static readonly HexTileData[] DefaultHexTiles =
 	[
-		new HexTileData(new Vector2(0, 0), HexBase.Wilds, OverlayType.None),
-		new HexTileData(new Vector2(348, 0), HexBase.Wilds, OverlayType.None),
-		new HexTileData(new Vector2(696, 0), HexBase.Wilds, OverlayType.None),
-		new HexTileData(new Vector2(174, 100), HexBase.Wasted, OverlayType.None),
-		new HexTileData(new Vector2(522, 100), HexBase.Wilds, OverlayType.None),
-		new HexTileData(new Vector2(348, 200), HexBase.Wilds, OverlayType.Human),
-		new HexTileData(new Vector2(522, 300), HexBase.Wasted, OverlayType.Human),
-		new HexTileData(new Vector2(174, 300), HexBase.Wilds, OverlayType.None),
-		new HexTileData(new Vector2(0, 400), HexBase.Wilds, OverlayType.None),
-		new HexTileData(new Vector2(348, 400), HexBase.Wasted, OverlayType.Tech),
-		new HexTileData(new Vector2(696, 400), HexBase.Wasted, OverlayType.Tech),
+		new HexTileData(0, new Vector2(348, 200), HexBase.Wilds, OverlayType.Tech, false),
+		new HexTileData(1, new Vector2(348, 0), HexBase.Wasted, OverlayType.None, false),
+		new HexTileData(2, new Vector2(522, 100), HexBase.Wilds, OverlayType.None, false),
+		new HexTileData(3, new Vector2(522, 300), HexBase.Wilds, OverlayType.Tech, false),
+		new HexTileData(4, new Vector2(348, 400), HexBase.Wilds, OverlayType.Human, false),
+		new HexTileData(5, new Vector2(174, 300), HexBase.Wilds, OverlayType.None, false),
+		new HexTileData(6, new Vector2(174, 100), HexBase.Wilds, OverlayType.None, false),
+		new HexTileData(7, new Vector2(0, 0), HexBase.Wilds, OverlayType.None, false),
+		new HexTileData(8, new Vector2(696, 0), HexBase.Wilds, OverlayType.None, false),
+		new HexTileData(9, new Vector2(0, 400), HexBase.Wilds, OverlayType.Tech, false),
+		new HexTileData(10, new Vector2(696, 400), HexBase.Wasted, OverlayType.None, false),
 	];
 
 	public override void _Ready()
@@ -65,6 +67,7 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 
 		_hitArea.Pressed += () => ToggleRequested?.Invoke();
 
+		_snapshotTiles = new List<HexTileData>(DefaultHexTiles);
 		ConfigurePreview();
 		BuildDropdownSections();
 		SetDropdownVisible(false);
@@ -91,6 +94,51 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 	{
 		_previewTitleLabel.Text = title;
 		_previewBodyLabel.Text = description;
+	}
+
+	public void SetGoalConflictTiles(IReadOnlyList<int> tileIndices)
+	{
+		_goalConflictTileIndices.Clear();
+		foreach (var tileIndex in tileIndices)
+		{
+			_goalConflictTileIndices.Add(tileIndex);
+		}
+
+		if (IsNodeReady())
+		{
+			BuildDropdownSections();
+		}
+	}
+
+	public void SetHiveGridSnapshot(IReadOnlyList<BoardTileVm> tiles)
+	{
+		var nextTiles = new List<HexTileData>(tiles.Count);
+		foreach (var tile in tiles)
+		{
+			if (!TryGetTilePosition(tile.TileIndex, out var position))
+			{
+				continue;
+			}
+
+			nextTiles.Add(
+				new HexTileData(
+					tile.TileIndex,
+					position,
+					ToHexBase(tile.DownType),
+					ToOverlay(tile.UpType),
+					tile.ConflictHighlight
+				)
+			);
+		}
+
+		_snapshotTiles = nextTiles.Count > 0
+			? nextTiles
+			: new List<HexTileData>(DefaultHexTiles);
+
+		if (IsNodeReady())
+		{
+			BuildDropdownSections();
+		}
 	}
 
 	public void SetPopupHost(Control popupHost)
@@ -155,9 +203,8 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 			child.QueueFree();
 		}
 
-		_sections.AddChild(CreateDescriptionSection(new Vector2(760, 300)));
-		_sections.AddChild(CreateMiniGridSection(new Vector2(760, 360)));
-		_sections.AddChild(CreateConditionSection(new Vector2(760, 170)));
+		_sections.AddChild(CreateDescriptionSection(new Vector2(760, 536)));
+		_sections.AddChild(CreateMiniGridSection(new Vector2(760, 310)));
 	}
 
 	private Panel CreateDescriptionSection(Vector2 size)
@@ -171,7 +218,7 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 		if (teamGoalTexture != null)
 		{
 			ApplyRoundedStyle(section, Colors.Transparent, 0);
-			section.AddChild(CreateImageRect(teamGoalTexture, Vector2.Zero, size, TextureRect.StretchModeEnum.KeepAspectCentered));
+			section.AddChild(CreateImageRect(teamGoalTexture, Vector2.Zero, size, TextureRect.StretchModeEnum.KeepAspectCovered));
 			return section;
 		}
 
@@ -235,16 +282,15 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 		section.SizeFlagsHorizontal = SizeFlags.ExpandFill;
 		section.ClipContents = true;
 
-		section.AddChild(CreateTextLabel("Hivegrid Snapshot (Conflict Highlight)", 24, Colors.Black, new Vector2(28, 16), new Vector2(size.X - 56, 34), HorizontalAlignment.Left));
-
-		const float miniOuterSide = 62.0f;
+		const float miniOuterSide = 52.0f;
 		const float miniInnerSide = miniOuterSide - HexOutlineWidth;
-		const float miniOverlayOuterSide = 46.0f;
+		const float miniOverlayOuterSide = 38.0f;
 		const float miniOverlayInnerSide = miniOverlayOuterSide - HexOutlineWidth;
-		const float miniPositionScale = 0.5f;
+		const float miniPositionScale = 0.42f;
 
-		var boardArea = new Rect2(36, 58, size.X - 72, size.Y - 84);
-		var miniClusterSize = GetScaledHexClusterSize(miniPositionScale, miniOuterSide);
+		var boardArea = new Rect2(36, 18, size.X - 72, size.Y - 36);
+		var tiles = _snapshotTiles.Count > 0 ? _snapshotTiles : new List<HexTileData>(DefaultHexTiles);
+		var miniClusterSize = GetScaledHexClusterSize(tiles, miniPositionScale, miniOuterSide);
 		var cluster = new Control();
 		cluster.Position = new Vector2(
 			boardArea.Position.X + (boardArea.Size.X - miniClusterSize.X) * 0.5f,
@@ -253,13 +299,13 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 		cluster.Size = miniClusterSize;
 		section.AddChild(cluster);
 
-		for (int index = 0; index < _hexTiles.Length; index++)
+		foreach (var tile in tiles)
 		{
-			var isConflict = index == 3 || index == 9;
+			var isConflict = tile.ConflictHighlight || _goalConflictTileIndices.Contains(tile.TileIndex);
 			cluster.AddChild(
 				CreateMiniHexTile(
-					_hexTiles[index],
-					_hexTiles[index].Position * miniPositionScale,
+					tile,
+					tile.Position * miniPositionScale,
 					miniOuterSide,
 					miniInnerSide,
 					miniOverlayOuterSide,
@@ -272,58 +318,42 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 		return section;
 	}
 
-	private Panel CreateConditionSection(Vector2 size)
+	private static bool TryGetTilePosition(int tileIndex, out Vector2 position)
 	{
-		var section = CreateRoundedPanel(Vector2.Zero, size, Color.FromHtml("#EFEFEF"), 40, _inkColor, 3);
-		section.CustomMinimumSize = size;
-		section.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-		section.ClipContents = true;
+		foreach (var tile in DefaultHexTiles)
+		{
+			if (tile.TileIndex == tileIndex)
+			{
+				position = tile.Position;
+				return true;
+			}
+		}
 
-		var rows = new VBoxContainer();
-		rows.Position = new Vector2(26, 26);
-		rows.Size = new Vector2(size.X - 52, size.Y - 52);
-		rows.AddThemeConstantOverride("separation", 14);
-		section.AddChild(rows);
-
-		var rowA = new HBoxContainer();
-		rowA.AddThemeConstantOverride("separation", 30);
-		rowA.AddChild(CreateConditionItem("H", "0 / 12 Not satisfied", Color.FromHtml("#71EFE5")));
-		rowA.AddChild(CreateConditionItem("T", "0 / 12 Not satisfied", Color.FromHtml("#71EFE5")));
-		rows.AddChild(rowA);
-
-		var rowB = new HBoxContainer();
-		rowB.AddThemeConstantOverride("separation", 30);
-		rowB.AddChild(CreateConditionItem("E", "0 / 12 Not satisfied", Color.FromHtml("#71EFE5")));
-		rowB.AddChild(CreateConditionItem("X", "0 / 0 Satisfied", Color.FromHtml("#F8483F")));
-		rows.AddChild(rowB);
-
-		return section;
+		position = Vector2.Zero;
+		return false;
 	}
 
-	private Control CreateConditionItem(string symbol, string statusText, Color symbolColor)
+	private static HexBase ToHexBase(BoardTileKind kind)
 	{
-		var item = new HBoxContainer();
-		item.AddThemeConstantOverride("separation", 12);
-
-		var icon = CreateRoundedPanel(Vector2.Zero, new Vector2(30, 30), symbolColor, 15, _inkColor, 2);
-		icon.AddChild(CreateTextLabel(symbol, 16, Colors.Black, new Vector2(0, 3), new Vector2(30, 24), HorizontalAlignment.Center));
-		item.AddChild(icon);
-
-		var status = new Label();
-		status.Text = statusText;
-		status.AddThemeFontSizeOverride("font_size", 18);
-		status.AddThemeColorOverride("font_color", Colors.Black);
-		status.VerticalAlignment = VerticalAlignment.Center;
-		item.AddChild(status);
-		return item;
+		return kind == BoardTileKind.Wasted ? HexBase.Wasted : HexBase.Wilds;
 	}
 
-	private Vector2 GetScaledHexClusterSize(float positionScale, float outerSide)
+	private static OverlayType ToOverlay(BoardTileKind? kind)
+	{
+		return kind switch
+		{
+			BoardTileKind.Human => OverlayType.Human,
+			BoardTileKind.Technology => OverlayType.Tech,
+			_ => OverlayType.None,
+		};
+	}
+
+	private static Vector2 GetScaledHexClusterSize(IReadOnlyList<HexTileData> tiles, float positionScale, float outerSide)
 	{
 		var outerSize = GetHexBounds(outerSide);
 		var maxX = 0.0f;
 		var maxY = 0.0f;
-		foreach (var tile in _hexTiles)
+		foreach (var tile in tiles)
 		{
 			var scaledPos = tile.Position * positionScale;
 			maxX = Mathf.Max(maxX, scaledPos.X + outerSize.X);
@@ -346,12 +376,11 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 		wrapper.Position = position;
 		var outerSize = GetHexBounds(outerSide);
 		wrapper.Size = outerSize;
+		wrapper.ClipContents = true;
 		var center = outerSize / 2.0f;
 
 		if (isConflict)
 		{
-			wrapper.AddChild(CreateHexPolygon(outerSide + 7.0f, center, Color.FromHtml("#EEF55D")));
-			wrapper.AddChild(CreateHexPolygon(outerSide + 3.0f, center, Color.FromHtml("#E2C54D")));
 			wrapper.AddChild(CreateHexPolygon(outerSide, center, _inkColor));
 			wrapper.AddChild(CreateHexPolygon(innerSide, center, Color.FromHtml("#F82D23")));
 			return wrapper;
@@ -616,11 +645,19 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 		return originalParentControl.GlobalPosition + _dropdownLocalPosition;
 	}
 
-	private readonly struct HexTileData(Vector2 position, HexBase @base, OverlayType overlay)
+	private readonly struct HexTileData(
+		int tileIndex,
+		Vector2 position,
+		HexBase @base,
+		OverlayType overlay,
+		bool conflictHighlight
+	)
 	{
+		public int TileIndex { get; } = tileIndex;
 		public Vector2 Position { get; } = position;
 		public HexBase Base { get; } = @base;
 		public OverlayType Overlay { get; } = overlay;
+		public bool ConflictHighlight { get; } = conflictHighlight;
 	}
 
 	private enum HexBase

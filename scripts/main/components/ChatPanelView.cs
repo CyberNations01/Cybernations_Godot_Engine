@@ -6,6 +6,8 @@ public partial class ChatPanelView : Control, IChatPanelView
 {
 	private static readonly Vector2 CollapsedLogPosition = Vector2.Zero;
 	private static readonly Vector2 ExpandedLogPosition = new Vector2(0.0f, -568.0f);
+	private static readonly Vector2 CollapsedLogSize = new Vector2(500.0f, 260.0f);
+	private static readonly Vector2 CollapsedBodySize = new Vector2(464.0f, 190.0f);
 
 	private readonly Color _textColor = Color.FromHtml("#16222B");
 
@@ -83,12 +85,12 @@ public partial class ChatPanelView : Control, IChatPanelView
 		{
 			RestoreExpandedElementsToLocalParent();
 			_chatLogPanel.Position = CollapsedLogPosition;
-			_chatLogPanel.Size = new Vector2(500, 350);
+			_chatLogPanel.Size = CollapsedLogSize;
 			_chatLogHitArea.Position = _chatLogPanel.Position;
 			_chatLogHitArea.Size = _chatLogPanel.Size;
 		}
 
-		_chatBodyLabel.Size = expanded ? new Vector2(464, 864) : new Vector2(464, 280);
+		_chatBodyLabel.Size = expanded ? new Vector2(464, 864) : CollapsedBodySize;
 		RefreshChatLogDisplay();
 	}
 

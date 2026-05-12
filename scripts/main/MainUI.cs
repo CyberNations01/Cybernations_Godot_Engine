@@ -157,6 +157,7 @@ public partial class MainUI : Control
 	private InfoSummaryPanelView _infoSummaryPanelView = null!;
 	private HiveBoardView _hiveBoardView = null!;
 	private ResourceTracksView _resourceTracksView = null!;
+	private FeedbackTrackView _feedbackTrackView = null!;
 	private NationLevelBadgeView _nationLevelBadgeView = null!;
 	private TurnDotsView _turnDotsView = null!;
 	private PlayerPanelView _playerPanelView = null!;
@@ -188,6 +189,7 @@ public partial class MainUI : Control
 		_gameStartOverlayView = GetNode<GameStartOverlayView>("UIMain/GameStartOverlay");
 		_hiveBoardView = GetNode<HiveBoardView>("World/GameBoard");
 		_resourceTracksView = GetNode<ResourceTracksView>("UIMain/ResourceTracks");
+		_feedbackTrackView = GetNode<FeedbackTrackView>("UIMain/FeedbackTrack");
 		_nationLevelBadgeView = GetNode<NationLevelBadgeView>("UIMain/NationLevelBadge");
 		_turnDotsView = GetNode<TurnDotsView>("UIMain/TurnDots");
 		
@@ -232,6 +234,7 @@ public partial class MainUI : Control
 			_infoSummaryPanelView,
 			_hiveBoardView,
 			_resourceTracksView,
+			_feedbackTrackView,
 			_nationLevelBadgeView,
 			_turnDotsView,
 			_playerPanelView,

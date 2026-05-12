@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/main/components/FeedbackTrackView.cs" id="1_script"]
+
+[node name="FeedbackTrack" type="Control"]
+offset_right = 500.0
+offset_bottom = 56.0
+script = ExtResource("1_script")

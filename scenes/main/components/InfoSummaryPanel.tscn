@@ -7,14 +7,14 @@ script = ExtResource("1_script")
 
 [node name="PreviewPanel" type="Panel" parent="."]
 offset_right = 500.0
-offset_bottom = 292.0
+offset_bottom = 220.0
 clip_contents = true
 
 [node name="Layout" type="VBoxContainer" parent="PreviewPanel"]
 offset_left = 18.0
 offset_top = 14.0
 offset_right = 482.0
-offset_bottom = 264.0
+offset_bottom = 192.0
 theme_override_constants/separation = 10
 clip_contents = true
 
@@ -30,7 +30,7 @@ autowrap_mode = 3
 
 [node name="PreviewHitArea" type="Button" parent="."]
 offset_right = 500.0
-offset_bottom = 292.0
+offset_bottom = 220.0
 focus_mode = 0
 mouse_default_cursor_shape = 2
 flat = true

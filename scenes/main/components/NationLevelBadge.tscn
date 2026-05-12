@@ -3,6 +3,6 @@
 [ext_resource type="Script" path="res://scripts/main/components/NationLevelBadgeView.cs" id="1_script"]
 
 [node name="NationLevelBadge" type="Control"]
-offset_right = 112.0
+offset_right = 140.0
 offset_bottom = 140.0
 script = ExtResource("1_script")

@@ -437,8 +437,58 @@ public sealed class CybernationRestGameGateway : IGameGateway
 		var met = GetBool(activeGoal, "met", false);
 		return new TeamGoalStatePayload(
 			name,
-			$"Goal #{id}\nStatus: {(met ? "Met" : "Not met")}"
+			$"Goal #{id}\nStatus: {(met ? "Met" : "Not met")}",
+			BuildGoalConflictTileIndices(gameState, activeGoal)
 		);
+	}
+
+	private static int[] BuildGoalConflictTileIndices(JsonElement gameState, JsonElement activeGoal)
+	{
+		if (!gameState.TryGetProperty("board", out var board) || board.ValueKind != JsonValueKind.Array)
+		{
+			return [];
+		}
+
+		var goalId = GetInt(activeGoal, "id", -1);
+		var conflicts = new List<int>();
+		foreach (var tile in board.EnumerateArray())
+		{
+			var index = GetInt(tile, "position", conflicts.Count);
+			var type = GetString(tile, "type", "Wild");
+			if (TileConflictsWithGoal(goalId, type))
+			{
+				conflicts.Add(index);
+			}
+		}
+
+		return conflicts.ToArray();
+	}
+
+	private static bool TileConflictsWithGoal(int goalId, string effectiveStackType)
+	{
+		var type = NormalizeStackType(effectiveStackType);
+		return goalId switch
+		{
+			0 => type != "Wild",
+			1 => type == "Wild",
+			3 => type == "DevA",
+			4 => type == "Waste",
+			5 => type != "Waste",
+			9 => type == "DevB",
+			_ => false,
+		};
+	}
+
+	private static string NormalizeStackType(string stackType)
+	{
+		return stackType.Trim().ToUpperInvariant() switch
+		{
+			"WILD" or "WILDS" => "Wild",
+			"WASTE" or "WASTED" => "Waste",
+			"DEVA" or "TECH" or "TECHNOLOGY" => "DevA",
+			"DEVB" or "HUMAN" or "PEOPLE" => "DevB",
+			_ => stackType,
+		};
 	}
 
 	private static InfoSummaryStatePayload BuildInfoSummary(
@@ -610,6 +660,8 @@ public sealed class CybernationRestGameGateway : IGameGateway
 		var cohesion = paramsElement.ValueKind == JsonValueKind.Object ? GetInt(paramsElement, "cohesion", 0) : 0;
 		var conflict = GetConflict(gameState);
 		var passedPlayers = BuildPassedPlayerSet(controller);
+		var feedbackTrack = GetFeedbackTrack(gameState);
+		var feedbackCursor = GetFeedbackCursor(gameState);
 
 		var players = BuildPlayers(gameState, passedPlayers, hr, env, tech, cybernation, cohesion);
 		var canAct = actionStatus == 0 && isVisible && currentPlayerId == localPlayerId;
@@ -628,8 +680,30 @@ public sealed class CybernationRestGameGateway : IGameGateway
 			canAct && hr >= 2,
 			canAct && env >= 2,
 			canAct,
-			statusMessage
+			statusMessage,
+			feedbackTrack,
+			feedbackCursor
 		);
+	}
+
+	private static string[] GetFeedbackTrack(JsonElement gameState)
+	{
+		if (!gameState.TryGetProperty("adapt", out var adapt) || adapt.ValueKind != JsonValueKind.Object)
+		{
+			return [];
+		}
+
+		return GetStringArray(adapt, "track") ?? [];
+	}
+
+	private static int GetFeedbackCursor(JsonElement gameState)
+	{
+		if (!gameState.TryGetProperty("adapt", out var adapt) || adapt.ValueKind != JsonValueKind.Object)
+		{
+			return 0;
+		}
+
+		return Math.Max(0, GetIntAny(adapt, 0, "cursor", "adaptCursor", "adapt_cursor"));
 	}
 
 	private static EnvisionPlayerStatePayload[] BuildPlayers(
@@ -1173,9 +1247,23 @@ public sealed class CybernationRestGameGateway : IGameGateway
 				tokenBagCount = random.Next(0, 31),
 				adapt = new
 				{
-					trackSize = random.Next(0, 8),
-					cursor = random.Next(0, 8),
+					trackSize = 11,
+					cursor = random.Next(0, 11),
 					complete = random.NextDouble() < 0.25,
+					track = new[]
+					{
+						"TURN_WILD",
+						"LOSE_COHESION",
+						"TURN_WASTE",
+						"SOLVE_DISRUPTION",
+						"DEVELOP_STACK",
+						"TRANSFORM_STACK",
+						"TURN_WILD",
+						"LOSE_COHESION",
+						"TURN_WASTE",
+						"SOLVE_DISRUPTION",
+						"DEVELOP_STACK",
+					},
 				},
 				players,
 				activeDisruption = random.NextDouble() < 0.5

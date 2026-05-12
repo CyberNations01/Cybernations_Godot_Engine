@@ -37,7 +37,11 @@ public readonly record struct GameStartStatePayload(
     string status_message
 );
 
-public readonly record struct TeamGoalStatePayload(string title, string description);
+public readonly record struct TeamGoalStatePayload(
+    string title,
+    string description,
+    int[]? conflict_tile_indices = null
+);
 
 public readonly record struct InfoSummaryStatePayload(string title, string body);
 
@@ -116,7 +120,9 @@ public readonly record struct EnvisionStatePayload(
     bool can_prepare,
     bool can_steer,
     bool can_pass,
-    string status_message
+    string status_message,
+    string[]? feedback_track = null,
+    int feedback_cursor = 0
 );
 
 public readonly record struct ErrorPayload(string code, string reason);
