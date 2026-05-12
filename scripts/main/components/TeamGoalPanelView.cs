@@ -15,6 +15,7 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 	private const string WastedTexturePath = "res://assets/Waste.png";
 	private const string HumanTexturePath = "res://assets/Human.png";
 	private const string TechnologyTexturePath = "res://assets/Tech.png";
+	private const string TeamGoalTexturePath = "res://assets/TeamGoal.png";
 
 	private Panel _previewPanel = null!;
 	private Label _previewTitleLabel = null!;
@@ -128,10 +129,18 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 
 	private void ConfigurePreview()
 	{
-		ApplyRoundedStyle(_previewPanel, Color.FromHtml("#D7D7D7"), 0);
+		ApplyRoundedStyle(_previewPanel, Colors.Transparent, 0);
 		_previewPanel.ClipContents = true;
 		_previewTitleLabel.AddThemeColorOverride("font_color", _textColor);
 		_previewBodyLabel.AddThemeColorOverride("font_color", _textColor);
+		var teamGoalTexture = TryLoadTeamGoalTexture();
+		if (teamGoalTexture != null)
+		{
+			_previewPanel.AddChild(CreateImageRect(teamGoalTexture, Vector2.Zero, _previewPanel.Size, TextureRect.StretchModeEnum.KeepAspectCentered));
+			_previewTitleLabel.GetParent<Control>().Visible = false;
+			return;
+		}
+
 		SetPreview(
 			"Team Goal",
 			"Shared objective for every player:\n" +
@@ -161,13 +170,8 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 		var teamGoalTexture = TryLoadTeamGoalTexture();
 		if (teamGoalTexture != null)
 		{
-			var imageRect = new TextureRect();
-			imageRect.Position = Vector2.Zero;
-			imageRect.Size = size;
-			imageRect.Texture = teamGoalTexture;
-			imageRect.ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize;
-			imageRect.StretchMode = TextureRect.StretchModeEnum.KeepAspectCovered;
-			section.AddChild(imageRect);
+			ApplyRoundedStyle(section, Colors.Transparent, 0);
+			section.AddChild(CreateImageRect(teamGoalTexture, Vector2.Zero, size, TextureRect.StretchModeEnum.KeepAspectCentered));
 			return section;
 		}
 
@@ -200,6 +204,7 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 	{
 		string[] candidatePaths =
 		{
+			TeamGoalTexturePath,
 			"res://TeamGoalReconnect.png",
 			"res://team_goal_reconnect.png",
 			"res://assets/TeamGoalReconnect.png",
@@ -434,6 +439,23 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 		label.AddThemeFontSizeOverride("font_size", fontSize);
 		label.AddThemeColorOverride("font_color", fontColor);
 		return label;
+	}
+
+	private static TextureRect CreateImageRect(
+		Texture2D texture,
+		Vector2 position,
+		Vector2 size,
+		TextureRect.StretchModeEnum stretchMode
+	)
+	{
+		var imageRect = new TextureRect();
+		imageRect.Position = position;
+		imageRect.Size = size;
+		imageRect.Texture = texture;
+		imageRect.ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize;
+		imageRect.StretchMode = stretchMode;
+		imageRect.MouseFilter = MouseFilterEnum.Ignore;
+		return imageRect;
 	}
 
 	private static Polygon2D CreateHexPolygon(float sideLength, Vector2 center, Color color)

@@ -1,9 +1,18 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 
 public partial class ResourceTracksView : Control, IResourceTracksView
 {
 	private const int TotalResourceCells = 25;
+	private const float RowHeight = 72.0f;
+	private const float RowGap = 16.0f;
+	private const float IconSize = 72.0f;
+	private const float TrackCenterY = RowHeight * 0.5f;
+	private const float TrackStartX = 102.0f;
+	private const float CellWidth = 28.0f;
+	private const float CellHeight = 46.0f;
+	private const float CellGap = 8.0f;
 
 	private readonly Color _inkColor = Color.FromHtml("#2B2726");
 	private readonly Color _iconFillColor = Color.FromHtml("#DFD7CE");
@@ -12,6 +21,10 @@ public partial class ResourceTracksView : Control, IResourceTracksView
 	private readonly Color _humanColor = Color.FromHtml("#C92CC1");
 	private readonly Color _technologyColor = Color.FromHtml("#3D29ED");
 	private readonly Color _environmentColor = Color.FromHtml("#6CE575");
+	private const string HumanRelationIconPath = "res://assets/Relation_Human.png";
+	private const string TechnologyRelationIconPath = "res://assets/Relation_Tech.png";
+	private const string EnvironmentRelationIconPath = "res://assets/Relation_Environment.png";
+	private readonly Dictionary<string, Texture2D?> _textureCache = [];
 
 	[Export]
 	public int Human { get; set; } = 13;
@@ -54,25 +67,26 @@ public partial class ResourceTracksView : Control, IResourceTracksView
 			child.QueueFree();
 		}
 
-		AddChild(CreateTrackRow(new Vector2(0, 0), new RowSpec("H", Human, _humanColor)));
-		AddChild(CreateTrackRow(new Vector2(0, 88), new RowSpec("T", Technology, _technologyColor)));
-		AddChild(CreateTrackRow(new Vector2(0, 176), new RowSpec("E", Environment, _environmentColor)));
+		AddChild(CreateTrackRow(new Vector2(0, 0), new RowSpec("H", Human, _humanColor, HumanRelationIconPath)));
+		AddChild(CreateTrackRow(new Vector2(0, RowHeight + RowGap), new RowSpec("T", Technology, _technologyColor, TechnologyRelationIconPath)));
+		AddChild(CreateTrackRow(new Vector2(0, (RowHeight + RowGap) * 2.0f), new RowSpec("E", Environment, _environmentColor, EnvironmentRelationIconPath)));
 	}
 
 	private Control CreateTrackRow(Vector2 position, RowSpec rowSpec)
 	{
 		var row = new Control();
 		row.Position = position;
-		row.Size = new Vector2(1010, 64);
+		row.Size = new Vector2(1010, RowHeight);
 
-		var iconBox = CreateRoundedPanel(Vector2.Zero, new Vector2(72, 72), _iconFillColor, 18);
-		row.AddChild(iconBox);
-		row.AddChild(CreateTextLabel(rowSpec.Label, 28, Colors.Black, new Vector2(0, 18), new Vector2(72, 34), HorizontalAlignment.Center));
-
-		const float trackStartX = 102.0f;
-		const float cellWidth = 28.0f;
-		const float cellHeight = 46.0f;
-		const float gap = 8.0f;
+		var iconTexture = LoadTexture(rowSpec.IconTexturePath);
+		if (iconTexture != null)
+		{
+			row.AddChild(CreateIconImage(iconTexture));
+		}
+		else
+		{
+			row.AddChild(CreateTextLabel(rowSpec.Label, 28, Colors.Black, new Vector2(0, 18), new Vector2(IconSize, 34), HorizontalAlignment.Center));
+		}
 
 		for (int index = 0; index < TotalResourceCells; index++)
 		{
@@ -88,8 +102,8 @@ public partial class ResourceTracksView : Control, IResourceTracksView
 			var radius = index == 0 || index == TotalResourceCells - 1 ? 14 : 4;
 			row.AddChild(
 				CreateRoundedPanel(
-					new Vector2(trackStartX + index * (cellWidth + gap), 8),
-					new Vector2(cellWidth, cellHeight),
+					new Vector2(TrackStartX + index * (CellWidth + CellGap), TrackCenterY - CellHeight * 0.5f),
+					new Vector2(CellWidth, CellHeight),
 					cellColor,
 					radius,
 					borderColor,
@@ -112,6 +126,24 @@ public partial class ResourceTracksView : Control, IResourceTracksView
 		var maxUsable = TotalResourceCells - conflictCells;
 		var clampedFilledCells = Math.Clamp(filledCells, 0, maxUsable);
 		return index < clampedFilledCells ? CellState.Filled : CellState.Empty;
+	}
+
+	private Texture2D? LoadTexture(string path)
+	{
+		if (_textureCache.TryGetValue(path, out var cachedTexture))
+		{
+			return cachedTexture;
+		}
+
+		if (!ResourceLoader.Exists(path))
+		{
+			_textureCache[path] = null;
+			return null;
+		}
+
+		var texture = GD.Load<Texture2D>(path);
+		_textureCache[path] = texture;
+		return texture;
 	}
 
 	private static Panel CreateRoundedPanel(
@@ -167,6 +199,18 @@ public partial class ResourceTracksView : Control, IResourceTracksView
 		return label;
 	}
 
+	private static TextureRect CreateIconImage(Texture2D texture)
+	{
+		var imageRect = new TextureRect();
+		imageRect.Position = Vector2.Zero;
+		imageRect.Size = new Vector2(IconSize, IconSize);
+		imageRect.Texture = texture;
+		imageRect.ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize;
+		imageRect.StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered;
+		imageRect.MouseFilter = MouseFilterEnum.Ignore;
+		return imageRect;
+	}
+
 	private enum CellState
 	{
 		Empty,
@@ -174,5 +218,5 @@ public partial class ResourceTracksView : Control, IResourceTracksView
 		Conflict,
 	}
 
-	private readonly record struct RowSpec(string Label, int Value, Color FillColor);
+	private readonly record struct RowSpec(string Label, int Value, Color FillColor, string IconTexturePath);
 }
