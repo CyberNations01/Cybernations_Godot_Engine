@@ -8,11 +8,17 @@ public partial class HiveBoardView : Node2D, IHiveBoardView
 	public PackedScene? TileScene { get; set; }
 
 	private Node2D _cluster = null!;
+	private Sprite2D _peopleTokenSprite = null!;
+	private Line2D _peopleTokenOutline = null!;
 	private readonly Dictionary<int, StackView> _tileViews = [];
 	private readonly Dictionary<EdgeKey, PathEdgeState> _pathEdges = [];
 	private readonly Dictionary<EdgeKey, BoardPathResourceTotalsVm> _pathComponentTotals = [];
 	private bool _pathSelectionEnabled;
 	private EdgeKey? _hoveredPathKey;
+	private const string PeopleTokenTexturePath = "res://assets/PeopleToken.png";
+	private const float PeopleTokenDisplaySize = 45.0f;
+	private const float PeopleTokenOutlineWidthRatio = 0.05f;
+	private const float PeopleTokenEdgeInsetFactor = 1.24f;
 
 	public event Action<BoardPathHoverVm?>? PathHovered;
 
@@ -36,6 +42,7 @@ public partial class HiveBoardView : Node2D, IHiveBoardView
 	{
 		_cluster = GetNode<Node2D>("Cluster");
 		BuildFixedBoard();
+		CreatePeopleTokenSprite();
 	}
 
 	public void BuildDefaultBoard()
@@ -217,6 +224,29 @@ public partial class HiveBoardView : Node2D, IHiveBoardView
 		SetPathSelectionEnabled(_pathSelectionEnabled);
 	}
 
+	public void SetPeopleToken(BoardPeopleTokenVm? peopleToken)
+	{
+		var peopleTokenSprite = EnsurePeopleTokenSprite();
+
+		if (!peopleToken.HasValue
+			|| peopleToken.Value.EdgeIndex < 0
+			|| peopleToken.Value.EdgeIndex >= 6
+			|| !TryGetTile(peopleToken.Value.TileIndex, out var tileView))
+		{
+			peopleTokenSprite.Visible = false;
+			return;
+		}
+
+		var edgePoint = GetPeopleTokenEdgePoint(
+			peopleToken.Value.EdgeIndex,
+			tileView.DownOuterSide
+		);
+		peopleTokenSprite.Position = _cluster.Position + tileView.Position + edgePoint;
+		_peopleTokenOutline.Position = peopleTokenSprite.Position;
+		_peopleTokenOutline.Visible = peopleTokenSprite.Texture != null;
+		peopleTokenSprite.Visible = peopleTokenSprite.Texture != null;
+	}
+
 	public void SetPathSelectionEnabled(bool enabled)
 	{
 		_pathSelectionEnabled = enabled;
@@ -266,6 +296,57 @@ public partial class HiveBoardView : Node2D, IHiveBoardView
 		tileView.PathHovered += edge => OnTilePathHovered(tileIndex, edge);
 		_cluster.AddChild(tileView);
 		return tileView;
+	}
+
+	private void CreatePeopleTokenSprite()
+	{
+		EnsurePeopleTokenSprite();
+	}
+
+	private Sprite2D EnsurePeopleTokenSprite()
+	{
+		if (_peopleTokenSprite != null)
+		{
+			return _peopleTokenSprite;
+		}
+
+		var texture = LoadTextureFromPath(PeopleTokenTexturePath);
+		var tokenRadius = PeopleTokenDisplaySize * 0.5f;
+		var outlineWidth = tokenRadius * PeopleTokenOutlineWidthRatio;
+		_peopleTokenOutline = new Line2D
+		{
+			Name = "PeopleTokenYellowOutline",
+			DefaultColor = Color.FromHtml("#F2D33A"),
+			Width = outlineWidth,
+			Closed = true,
+			Antialiased = true,
+			Visible = false,
+			ZIndex = 513,
+			Points = BuildCircleLinePoints(tokenRadius - outlineWidth * 0.5f, 64),
+		};
+		_peopleTokenSprite = new Sprite2D
+		{
+			Name = "PeopleToken",
+			Texture = texture,
+			Centered = true,
+			Visible = false,
+			ZIndex = 512,
+		};
+
+		if (texture != null)
+		{
+			var textureSize = texture.GetSize();
+			var longestSide = Mathf.Max(textureSize.X, textureSize.Y);
+			if (longestSide > 0.0f)
+			{
+				var scale = PeopleTokenDisplaySize / longestSide;
+				_peopleTokenSprite.Scale = new Vector2(scale, scale);
+			}
+		}
+
+		AddChild(_peopleTokenOutline);
+		AddChild(_peopleTokenSprite);
+		return _peopleTokenSprite;
 	}
 
 	private void RegisterPathEdge(int tileIndex, BoardEdgeVm edge)
@@ -430,6 +511,46 @@ public partial class HiveBoardView : Node2D, IHiveBoardView
 		}
 
 		return GD.Load<Texture2D>(path);
+	}
+
+	private static Vector2 GetPeopleTokenEdgePoint(int edgeIndex, float sideLength)
+	{
+		var center = GetHexBounds(sideLength) / 2.0f;
+		return GetEdgeAnchorPoint(edgeIndex, center, sideLength, PeopleTokenEdgeInsetFactor);
+	}
+
+	private static Vector2 GetHexBounds(float sideLength)
+	{
+		return new Vector2(sideLength * 2.0f, Mathf.Sqrt(3.0f) * sideLength);
+	}
+
+	private static Vector2 GetEdgeAnchorPoint(int edgeIndex, Vector2 center, float sideLength, float insetFactor)
+	{
+		var halfHeight = Mathf.Sqrt(3.0f) * sideLength * 0.5f;
+		var offset = edgeIndex switch
+		{
+			0 => new Vector2(0.0f, -halfHeight),
+			1 => new Vector2(sideLength * 0.75f, -halfHeight * 0.5f),
+			2 => new Vector2(sideLength * 0.75f, halfHeight * 0.5f),
+			3 => new Vector2(0.0f, halfHeight),
+			4 => new Vector2(-sideLength * 0.75f, halfHeight * 0.5f),
+			5 => new Vector2(-sideLength * 0.75f, -halfHeight * 0.5f),
+			_ => Vector2.Zero,
+		};
+
+		return center + offset * insetFactor;
+	}
+
+	private static Vector2[] BuildCircleLinePoints(float radius, int segments)
+	{
+		var points = new Vector2[segments];
+		for (var i = 0; i < segments; i++)
+		{
+			var angle = Mathf.Tau * i / segments;
+			points[i] = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
+		}
+
+		return points;
 	}
 
 	private static bool TryGetNeighbor(int tileIndex, int edgeIndex, out EdgeKey neighbor)

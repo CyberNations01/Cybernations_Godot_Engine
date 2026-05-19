@@ -66,7 +66,12 @@ public readonly record struct HiveBoardTilePayload(
     HiveBoardEdgePayload[]? edges
 );
 
-public readonly record struct HiveBoardStatePayload(HiveBoardTilePayload[] tiles);
+public readonly record struct HiveBoardPeopleTokenPayload(int tile, int side);
+
+public readonly record struct HiveBoardStatePayload(
+    HiveBoardTilePayload[] tiles,
+    HiveBoardPeopleTokenPayload? people_token = null
+);
 
 public readonly record struct SnapshotFullPayload(
     ChatMessageVm[] chat_messages,

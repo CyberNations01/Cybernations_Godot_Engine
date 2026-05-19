@@ -113,6 +113,8 @@ public partial class StackView : Node2D
 
 	private const string WildsTexturePath = "res://assets/Wilds.png";
 	private const string WastedTexturePath = "res://assets/Waste.png";
+	private const string WildsOuterFillTexturePath = "res://assets/wilds_bg.png";
+	private const string WastedOuterFillTexturePath = "res://assets/waste_bg.png";
 	private const string HumanTexturePath = "res://assets/Human.png";
 	private const string TechnologyTexturePath = "res://assets/Tech.png";
 	private const string GeneratedPathTexturePath = "res://assets/path.png";
@@ -139,6 +141,7 @@ public partial class StackView : Node2D
 	private readonly Texture2D?[] _defaultRelationTextures = new Texture2D?[6];
 	private readonly Texture2D?[] _defaultPathTextures = new Texture2D?[6];
 	private readonly Dictionary<TileKind, Texture2D?> _tileTextureCache = [];
+	private readonly Dictionary<TileKind, Texture2D?> _outerFillTextureCache = [];
 	private readonly Dictionary<string, Texture2D?> _resourceTextureCache = [];
 	private Texture2D? _generatedPathTexture;
 	private bool _generatedPathTextureLoaded;
@@ -157,7 +160,7 @@ public partial class StackView : Node2D
 	private const float PathOutlineWidth = 12.0f;
 	private const float PathEndpointExtension = 16.0f;
 	private const float PathTextureWidth = PathOutlineWidth;
-	private const float HexOutlineWidth = 7.0f;
+	private const float HexOutlineWidth = 3.5f;
 	private const float ResourceDotRadius = 6.5f;
 	private const float ResourceDotSpacing = ResourceDotRadius * 2.5f;
 	private const float ResourceIconSize = ResourceDotRadius * 2.7f;
@@ -507,12 +510,14 @@ public partial class StackView : Node2D
 		_downOutline.Visible = true;
 		_downFill.Color = ResolveTileColor(DownTileType);
 		var downTexture = ResolveTileTexture(DownTileType);
-		var showDownTexture = !HasUpTile && !_accessibilityBaseColorOverride.HasValue && downTexture != null;
+		var downOuterFillTexture = ResolveDownOuterFillTexture(DownTileType);
+		var selectedDownTexture = HasUpTile ? downOuterFillTexture : downTexture;
+		var showDownTexture = !_accessibilityBaseColorOverride.HasValue && selectedDownTexture != null;
 		_downFill.Visible = !showDownTexture;
 		_downTextureClip.Visible = showDownTexture;
 		if (showDownTexture)
 		{
-			ConfigureTextureSprite(_downTextureSprite, downTexture!, center, downInnerSide);
+			ConfigureTextureSprite(_downTextureSprite, selectedDownTexture!, center, downInnerSide);
 		}
 
 		var showUp = HasUpTile;
@@ -838,6 +843,16 @@ public partial class StackView : Node2D
 		};
 	}
 
+	private Texture2D? ResolveDownOuterFillTexture(TileKind tileKind)
+	{
+		return tileKind switch
+		{
+			TileKind.Wilds => LoadOuterFillTexture(tileKind, WildsOuterFillTexturePath),
+			TileKind.Wasted => LoadOuterFillTexture(tileKind, WastedOuterFillTexturePath),
+			_ => null,
+		};
+	}
+
 	private Texture2D? ResolveGeneratedPathTexture()
 	{
 		if (_generatedPathTextureLoaded)
@@ -873,6 +888,24 @@ public partial class StackView : Node2D
 		return texture;
 	}
 
+	private Texture2D? LoadOuterFillTexture(TileKind tileKind, string path)
+	{
+		if (_outerFillTextureCache.TryGetValue(tileKind, out var cachedTexture))
+		{
+			return cachedTexture;
+		}
+
+		if (!ResourceLoader.Exists(path))
+		{
+			_outerFillTextureCache[tileKind] = null;
+			return null;
+		}
+
+		var texture = GD.Load<Texture2D>(path);
+		_outerFillTextureCache[tileKind] = texture;
+		return texture;
+	}
+
 	private static void ConfigureTextureSprite(Sprite2D sprite, Texture2D texture, Vector2 center, float sideLength)
 	{
 		var targetSize = GetHexBounds(sideLength);
@@ -880,6 +913,8 @@ public partial class StackView : Node2D
 		var scale = GetAspectCoveredScale(textureSize, targetSize);
 
 		sprite.Texture = texture;
+		sprite.RegionEnabled = false;
+		sprite.RegionRect = new Rect2(Vector2.Zero, textureSize);
 		sprite.Position = center;
 		sprite.Rotation = 0.0f;
 		sprite.Scale = new Vector2(scale, scale);

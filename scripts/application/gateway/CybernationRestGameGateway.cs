@@ -1118,7 +1118,7 @@ public sealed class CybernationRestGameGateway : IGameGateway
 	{
 		if (!gameState.TryGetProperty("board", out var board) || board.ValueKind != JsonValueKind.Array)
 		{
-			return new HiveBoardStatePayload(Array.Empty<HiveBoardTilePayload>());
+			return new HiveBoardStatePayload(Array.Empty<HiveBoardTilePayload>(), BuildPeopleToken(gameState));
 		}
 
 		var tiles = new List<HiveBoardTilePayload>();
@@ -1130,7 +1130,21 @@ public sealed class CybernationRestGameGateway : IGameGateway
 			tiles.Add(new HiveBoardTilePayload(index, down, up, false, BuildHiveBoardEdges(tile)));
 		}
 
-		return new HiveBoardStatePayload(tiles.ToArray());
+		return new HiveBoardStatePayload(tiles.ToArray(), BuildPeopleToken(gameState));
+	}
+
+	private static HiveBoardPeopleTokenPayload? BuildPeopleToken(JsonElement gameState)
+	{
+		if (!gameState.TryGetProperty("peopleToken", out var peopleToken)
+			|| peopleToken.ValueKind != JsonValueKind.Array
+			|| peopleToken.GetArrayLength() < 2
+			|| !TryReadInt(peopleToken[0], out var tile)
+			|| !TryReadInt(peopleToken[1], out var side))
+		{
+			return null;
+		}
+
+		return new HiveBoardPeopleTokenPayload(tile, side);
 	}
 
 	private static HiveBoardEdgePayload[]? BuildHiveBoardEdges(JsonElement tile)
@@ -1827,6 +1841,7 @@ public sealed class CybernationRestGameGateway : IGameGateway
 				},
 				conflict,
 				board,
+				peopleToken = new[] { 4, 4 },
 				pool = new
 				{
 					turnWild = random.Next(0, 6),

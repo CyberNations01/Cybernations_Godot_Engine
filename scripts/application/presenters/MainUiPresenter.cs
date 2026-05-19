@@ -630,6 +630,11 @@ public sealed class MainUiPresenter : IDisposable
 		}
 
 		_hiveBoardView.ApplyTiles(tiles);
+		_hiveBoardView.SetPeopleToken(
+			payload.people_token.HasValue
+				? new BoardPeopleTokenVm(payload.people_token.Value.tile, payload.people_token.Value.side)
+				: null
+		);
 		_teamGoalPanelView.SetHiveGridSnapshot(tiles);
 	}
 

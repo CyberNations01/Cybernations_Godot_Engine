@@ -10,12 +10,17 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 	private readonly Color _wastedColor = Color.FromHtml("#D07D29");
 	private readonly Color _humanOverlayColor = Color.FromHtml("#C92CC1");
 	private readonly Color _techOverlayColor = Color.FromHtml("#3D29ED");
-	private const float HexOutlineWidth = 7.0f;
+	private const float HexOutlineWidth = 3.5f;
 	private const string WildsTexturePath = "res://assets/Wilds.png";
 	private const string WastedTexturePath = "res://assets/Waste.png";
 	private const string HumanTexturePath = "res://assets/Human.png";
 	private const string TechnologyTexturePath = "res://assets/Tech.png";
 	private const string TeamGoalTexturePath = "res://assets/TeamGoal.png";
+	private const int PreviewTitleFontSize = 24;
+	private const int PreviewConditionFontSize = 17;
+	private const int ScrollDetailFontSize = 24;
+	private readonly Color _scrollInkColor = Color.FromHtml("#342114");
+	private readonly Color _scrollOutlineColor = Color.FromHtml("#C99D5C");
 
 	private Panel _previewPanel = null!;
 	private Label _previewTitleLabel = null!;
@@ -201,8 +206,8 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 	{
 		ApplyRoundedStyle(_previewPanel, Colors.Transparent, 0);
 		_previewPanel.ClipContents = true;
-		_previewTitleLabel.AddThemeColorOverride("font_color", _textColor);
-		_previewBodyLabel.AddThemeColorOverride("font_color", _textColor);
+		ApplyScrollTextStyle(_previewTitleLabel, PreviewTitleFontSize, _scrollInkColor, 2);
+		ApplyScrollTextStyle(_previewBodyLabel, PreviewConditionFontSize, _scrollInkColor, 2);
 		_previewTitleLabel.HorizontalAlignment = HorizontalAlignment.Center;
 		_previewTitleLabel.VerticalAlignment = VerticalAlignment.Center;
 		_previewBodyLabel.HorizontalAlignment = HorizontalAlignment.Center;
@@ -260,16 +265,16 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 
 		var goalName = string.IsNullOrWhiteSpace(_previewTitleLabel.Text) ? "Team Goal" : _previewTitleLabel.Text;
 		var textArea = GetScrollTextRect(size);
-		section.AddChild(
-			CreateWrappedTextLabel(
-				BuildGoalDetailText(goalName),
-				21,
-				Color.FromHtml("#242424"),
-				textArea.Position,
-				textArea.Size,
-				HorizontalAlignment.Center
-			)
+		var detailLabel = CreateWrappedTextLabel(
+			BuildGoalDetailText(goalName),
+			ScrollDetailFontSize,
+			_scrollInkColor,
+			textArea.Position,
+			textArea.Size,
+			HorizontalAlignment.Center
 		);
+		ApplyScrollTextStyle(detailLabel, ScrollDetailFontSize, _scrollInkColor, 2);
+		section.AddChild(detailLabel);
 
 		return section;
 	}
@@ -385,6 +390,16 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 		}
 
 		return string.Join("\n", lines);
+	}
+
+	private void ApplyScrollTextStyle(Label label, int fontSize, Color fontColor, int outlineSize)
+	{
+		label.AddThemeFontOverride("font", GameTextStyle.HandwrittenFont);
+		label.AddThemeFontSizeOverride("font_size", fontSize);
+		label.AddThemeColorOverride("font_color", fontColor);
+		label.AddThemeColorOverride("font_outline_color", _scrollOutlineColor);
+		label.AddThemeConstantOverride("outline_size", outlineSize);
+		label.AddThemeConstantOverride("line_spacing", 3);
 	}
 
 	private static Rect2 GetScrollTextRect(Vector2 size)

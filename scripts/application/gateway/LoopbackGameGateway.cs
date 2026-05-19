@@ -163,7 +163,7 @@ public sealed class LoopbackGameGateway : IGameGateway
 				_chatMessages.ToArray(),
 				_teamGoalState,
 				_infoSummaryState,
-				new HiveBoardStatePayload(_hiveBoardTiles)
+				new HiveBoardStatePayload(_hiveBoardTiles, new HiveBoardPeopleTokenPayload(4, 4))
 			)
 		);
 		EmitEnvisionState(envelope, true, "Your turn. Choose an action.");

@@ -50,6 +50,8 @@ public readonly record struct BoardTileVm(
 	IReadOnlyList<BoardEdgeVm>? Edges
 );
 
+public readonly record struct BoardPeopleTokenVm(int TileIndex, int EdgeIndex);
+
 public readonly record struct PlayerPanelPlayerVm(
 	int Slot,
 	string Progress,
@@ -115,6 +117,7 @@ public interface IHiveBoardView
 	event Action<BoardPathHoverVm?> PathHovered;
 
 	void ApplyTiles(IReadOnlyList<BoardTileVm> tiles);
+	void SetPeopleToken(BoardPeopleTokenVm? peopleToken);
 	void SetPathSelectionEnabled(bool enabled);
 }
 

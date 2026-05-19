@@ -180,6 +180,8 @@ public partial class MainUI : Control
 
 	public override void _Ready()
 	{
+		Theme = GameTextStyle.GlobalTheme;
+
 		// Core UI views
 		_chatPanelView = GetNode<ChatPanelView>("UIMain/ChatPanel");
 		_teamGoalPanelView = GetNode<TeamGoalPanelView>("UIMain/TeamGoalPanel");
