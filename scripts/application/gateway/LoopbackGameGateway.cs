@@ -13,7 +13,14 @@ public sealed class LoopbackGameGateway : IGameGateway
 		new ChatMessageVm("P5", "Conflict blocks the final cells."),
 	];
 	private readonly TeamGoalStatePayload _teamGoalState =
-		new("Team Goal", "Shared objective for every player:\nStabilize the board and keep conflict under control.");
+		new(
+			"Restore and Rewild",
+			"Goal #0\nStatus: Not met\nConditions:\nWild EQ 11\nHR GE 11",
+			[1, 3, 6],
+			["Wild EQ 11", "HR GE 11"],
+			"All 11 board tiles must be Wild, and Human Relation must be at least 11.",
+			["Wild EQ 11 - current 8 (not satisfied)", "HR GE 11 - current 5 (not satisfied)"]
+		);
 	private readonly InfoSummaryStatePayload _infoSummaryState =
 		new("Information Panel", "Key state summary:\n- 5 players on the left\n- 11 map hexes in the center\n- 3 resource tracks at the bottom");
 	private readonly HiveBoardTilePayload[] _hiveBoardTiles =

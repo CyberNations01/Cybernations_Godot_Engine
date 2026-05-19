@@ -28,6 +28,12 @@ Entrance: `GET /state`, `POST /test/action`.
 ## Usage
 Use 
 
+If no room-server exists,
+
+`make -C ServerForTest room-server`
+
+then
+
 `cd ServerForTest`
 
 `./out/room-server`

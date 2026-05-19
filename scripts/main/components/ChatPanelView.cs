@@ -5,7 +5,7 @@ using Godot;
 public partial class ChatPanelView : Control, IChatPanelView
 {
 	private static readonly Vector2 CollapsedLogPosition = Vector2.Zero;
-	private static readonly Vector2 ExpandedLogPosition = new Vector2(0.0f, -568.0f);
+	private static readonly Vector2 ExpandedLogPosition = new Vector2(0.0f, -616.0f);
 	private static readonly Vector2 CollapsedLogSize = new Vector2(500.0f, 260.0f);
 	private static readonly Vector2 CollapsedBodySize = new Vector2(464.0f, 190.0f);
 

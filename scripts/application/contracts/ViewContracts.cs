@@ -95,6 +95,7 @@ public interface ITeamGoalPanelView : IPopupHostAwareView
 	bool IsDropdownVisible { get; }
 	void SetDropdownVisible(bool visible);
 	void SetPreview(string title, string description);
+	void SetGoalDetails(IReadOnlyList<string> conditionLines, string note, IReadOnlyList<string> clashNotes);
 	void SetGoalConflictTiles(IReadOnlyList<int> tileIndices);
 	void SetHiveGridSnapshot(IReadOnlyList<BoardTileVm> tiles);
 }

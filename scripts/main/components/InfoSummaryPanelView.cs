@@ -3,6 +3,8 @@ using Godot;
 
 public partial class InfoSummaryPanelView : Control, IInfoSummaryPanelView
 {
+	private static readonly Vector2 DropdownPopupOffset = new Vector2(0.0f, -48.0f);
+
 	private readonly Color _textColor = Color.FromHtml("#16222B");
 	private readonly Color _inkColor = Color.FromHtml("#2B2726");
 
@@ -191,6 +193,6 @@ public partial class InfoSummaryPanelView : Control, IInfoSummaryPanelView
 			return _dropdownPanel.GlobalPosition;
 		}
 
-		return originalParentControl.GlobalPosition + _dropdownLocalPosition;
+		return originalParentControl.GlobalPosition + _dropdownLocalPosition + DropdownPopupOffset;
 	}
 }

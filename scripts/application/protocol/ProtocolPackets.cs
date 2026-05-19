@@ -40,7 +40,10 @@ public readonly record struct GameStartStatePayload(
 public readonly record struct TeamGoalStatePayload(
     string title,
     string description,
-    int[]? conflict_tile_indices = null
+    int[]? conflict_tile_indices = null,
+    string[]? condition_lines = null,
+    string? note = null,
+    string[]? clash_notes = null
 );
 
 public readonly record struct InfoSummaryStatePayload(string title, string body);

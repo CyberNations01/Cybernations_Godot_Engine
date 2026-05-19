@@ -223,7 +223,7 @@ public sealed class MainUiPresenter : IDisposable
 		if (_cachedTeamGoalState.HasValue)
 		{
 			var cached = _cachedTeamGoalState.Value;
-			_teamGoalPanelView.SetPreview(cached.title, cached.description);
+			ApplyTeamGoalPayload(cached);
 			_teamGoalDetailOpenPending = false;
 		}
 		else
@@ -357,8 +357,7 @@ public sealed class MainUiPresenter : IDisposable
 		{
 			var teamGoal = payload.team_goal.Value;
 			_cachedTeamGoalState = teamGoal;
-			_teamGoalPanelView.SetPreview(teamGoal.title, teamGoal.description);
-			_teamGoalPanelView.SetGoalConflictTiles(teamGoal.conflict_tile_indices ?? Array.Empty<int>());
+			ApplyTeamGoalPayload(teamGoal);
 		}
 
 		if (payload.info_summary.HasValue)
@@ -417,13 +416,23 @@ public sealed class MainUiPresenter : IDisposable
 		}
 
 		_cachedTeamGoalState = payload;
-		_teamGoalPanelView.SetPreview(payload.title, payload.description);
-		_teamGoalPanelView.SetGoalConflictTiles(payload.conflict_tile_indices ?? Array.Empty<int>());
+		ApplyTeamGoalPayload(payload);
 		if (_teamGoalDetailOpenPending)
 		{
 			_teamGoalPanelView.SetDropdownVisible(true);
 			_teamGoalDetailOpenPending = false;
 		}
+	}
+
+	private void ApplyTeamGoalPayload(in TeamGoalStatePayload payload)
+	{
+		_teamGoalPanelView.SetPreview(payload.title, payload.description);
+		_teamGoalPanelView.SetGoalDetails(
+			payload.condition_lines ?? Array.Empty<string>(),
+			payload.note ?? "",
+			payload.clash_notes ?? Array.Empty<string>()
+		);
+		_teamGoalPanelView.SetGoalConflictTiles(payload.conflict_tile_indices ?? Array.Empty<int>());
 	}
 
 	private void ApplyInfoSummaryState(in PacketEnvelope envelope)

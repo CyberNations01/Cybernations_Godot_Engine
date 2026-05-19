@@ -29,6 +29,9 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 	private Vector2 _dropdownLocalPosition = Vector2.Zero;
 	private readonly Dictionary<string, Texture2D?> _hexTextureCache = [];
 	private readonly HashSet<int> _goalConflictTileIndices = [];
+	private IReadOnlyList<string> _goalConditionLines = Array.Empty<string>();
+	private IReadOnlyList<string> _goalClashNotes = Array.Empty<string>();
+	private string _goalNote = "No team goal note available.";
 	private List<HexTileData> _snapshotTiles = [];
 
 	public event Action? ToggleRequested;
@@ -66,6 +69,7 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 		_dropdownLocalPosition = _dropdownPanel.Position;
 
 		_hitArea.Pressed += () => ToggleRequested?.Invoke();
+		ApplyRoundedStyle(_dropdownPanel, Colors.Transparent, 0);
 
 		_snapshotTiles = new List<HexTileData>(DefaultHexTiles);
 		ConfigurePreview();
@@ -94,6 +98,24 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 	{
 		_previewTitleLabel.Text = title;
 		_previewBodyLabel.Text = description;
+	}
+
+	public void SetGoalDetails(IReadOnlyList<string> conditionLines, string note, IReadOnlyList<string> clashNotes)
+	{
+		_goalConditionLines = conditionLines.Count > 0
+			? new List<string>(conditionLines)
+			: Array.Empty<string>();
+		_goalNote = string.IsNullOrWhiteSpace(note)
+			? "No team goal note available."
+			: note.Trim();
+		_goalClashNotes = clashNotes.Count > 0
+			? new List<string>(clashNotes)
+			: Array.Empty<string>();
+
+		if (IsNodeReady())
+		{
+			BuildDropdownSections();
+		}
 	}
 
 	public void SetGoalConflictTiles(IReadOnlyList<int> tileIndices)
@@ -181,12 +203,27 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 		_previewPanel.ClipContents = true;
 		_previewTitleLabel.AddThemeColorOverride("font_color", _textColor);
 		_previewBodyLabel.AddThemeColorOverride("font_color", _textColor);
+		_previewTitleLabel.HorizontalAlignment = HorizontalAlignment.Center;
+		_previewTitleLabel.VerticalAlignment = VerticalAlignment.Center;
+		_previewBodyLabel.HorizontalAlignment = HorizontalAlignment.Center;
+		_previewBodyLabel.VerticalAlignment = VerticalAlignment.Center;
+		_previewBodyLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+
+		var previewTextArea = GetScrollTextRect(_previewPanel.Size);
+		var previewLayout = _previewTitleLabel.GetParent<Control>();
+		previewLayout.Position = previewTextArea.Position;
+		previewLayout.Size = previewTextArea.Size;
+		if (previewLayout is BoxContainer previewBox)
+		{
+			previewBox.Alignment = BoxContainer.AlignmentMode.Center;
+		}
+
 		var teamGoalTexture = TryLoadTeamGoalTexture();
 		if (teamGoalTexture != null)
 		{
-			_previewPanel.AddChild(CreateImageRect(teamGoalTexture, Vector2.Zero, _previewPanel.Size, TextureRect.StretchModeEnum.KeepAspectCentered));
-			_previewTitleLabel.GetParent<Control>().Visible = false;
-			return;
+			var imageRect = CreateImageRect(teamGoalTexture, Vector2.Zero, _previewPanel.Size, TextureRect.StretchModeEnum.KeepAspectCentered);
+			_previewPanel.AddChild(imageRect);
+			_previewPanel.MoveChild(imageRect, 0);
 		}
 
 		SetPreview(
@@ -209,7 +246,7 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 
 	private Panel CreateDescriptionSection(Vector2 size)
 	{
-		var section = CreateRoundedPanel(Vector2.Zero, size, Color.FromHtml("#EDEDED"), 44, _inkColor, 3);
+		var section = CreateRoundedPanel(Vector2.Zero, size, Colors.Transparent, 0);
 		section.CustomMinimumSize = size;
 		section.SizeFlagsHorizontal = SizeFlags.ExpandFill;
 		section.ClipContents = true;
@@ -217,29 +254,19 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 		var teamGoalTexture = TryLoadTeamGoalTexture();
 		if (teamGoalTexture != null)
 		{
-			ApplyRoundedStyle(section, Colors.Transparent, 0);
-			section.AddChild(CreateImageRect(teamGoalTexture, Vector2.Zero, size, TextureRect.StretchModeEnum.KeepAspectCovered));
-			return section;
+			var imageRect = CreateImageRect(teamGoalTexture, Vector2.Zero, size, TextureRect.StretchModeEnum.KeepAspectCentered);
+			section.AddChild(imageRect);
 		}
 
-		var header = new ColorRect();
-		header.Position = Vector2.Zero;
-		header.Size = new Vector2(size.X, 78);
-		header.Color = Color.FromHtml("#2F5CA7");
-		section.AddChild(header);
-
-		section.AddChild(CreateTextLabel("RECONNECT", 62, Colors.White, new Vector2(20, 6), new Vector2(size.X - 40, 68), HorizontalAlignment.Center));
-		section.AddChild(CreateTextLabel("Victory Condition:", 26, Colors.Black, new Vector2(44, 88), new Vector2(size.X - 88, 32), HorizontalAlignment.Left));
-		section.AddChild(CreateTextLabel("- No stacks are wasted", 22, Colors.Black, new Vector2(44, 126), new Vector2(size.X - 88, 28), HorizontalAlignment.Left));
-		section.AddChild(CreateTextLabel("- Human / Tech / Environment are each 12 or more", 22, Colors.Black, new Vector2(44, 158), new Vector2(size.X - 88, 28), HorizontalAlignment.Left));
-		section.AddChild(CreateTextLabel("Start effects: reconnect fragmented rings", 20, Colors.Black, new Vector2(44, 194), new Vector2(size.X - 88, 28), HorizontalAlignment.Left));
+		var goalName = string.IsNullOrWhiteSpace(_previewTitleLabel.Text) ? "Team Goal" : _previewTitleLabel.Text;
+		var textArea = GetScrollTextRect(size);
 		section.AddChild(
-			CreateTextLabel(
-				"We sought dynamic balance in nature and artifice.",
-				18,
-				Color.FromHtml("#666666"),
-				new Vector2(30, 238),
-				new Vector2(size.X - 60, 44),
+			CreateWrappedTextLabel(
+				BuildGoalDetailText(goalName),
+				21,
+				Color.FromHtml("#242424"),
+				textArea.Position,
+				textArea.Size,
 				HorizontalAlignment.Center
 			)
 		);
@@ -277,7 +304,7 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 
 	private Panel CreateMiniGridSection(Vector2 size)
 	{
-		var section = CreateRoundedPanel(Vector2.Zero, size, Color.FromHtml("#E9E9E9"), 44, _inkColor, 3);
+		var section = CreateRoundedPanel(Vector2.Zero, size, Color.FromHtml("#E9E9E9"), 24, _inkColor, 3);
 		section.CustomMinimumSize = size;
 		section.SizeFlagsHorizontal = SizeFlags.ExpandFill;
 		section.ClipContents = true;
@@ -288,7 +315,7 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 		const float miniOverlayInnerSide = miniOverlayOuterSide - HexOutlineWidth;
 		const float miniPositionScale = 0.42f;
 
-		var boardArea = new Rect2(36, 18, size.X - 72, size.Y - 36);
+		var boardArea = new Rect2(18, 18, 430, size.Y - 36);
 		var tiles = _snapshotTiles.Count > 0 ? _snapshotTiles : new List<HexTileData>(DefaultHexTiles);
 		var miniClusterSize = GetScaledHexClusterSize(tiles, miniPositionScale, miniOuterSide);
 		var cluster = new Control();
@@ -315,7 +342,61 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 			);
 		}
 
+		section.AddChild(CreateTextLabel("Clashes", 24, _textColor, new Vector2(470, 30), new Vector2(250, 32), HorizontalAlignment.Left));
+
+		var clashLines = _goalClashNotes.Count > 0
+			? _goalClashNotes
+			: new[] { "No unmet goal conditions." };
+		var y = 74.0f;
+		foreach (var clashLine in clashLines)
+		{
+			section.AddChild(
+				CreateWrappedTextLabel(
+					clashLine,
+					17,
+					_goalClashNotes.Count > 0 ? Color.FromHtml("#8C211B") : Color.FromHtml("#285C36"),
+					new Vector2(470, y),
+					new Vector2(250, 48),
+					HorizontalAlignment.Left
+				)
+			);
+			y += 54.0f;
+		}
+
 		return section;
+	}
+
+	private string BuildGoalDetailText(string goalName)
+	{
+		return $"{goalName}\n\n{_goalNote}\n\nConditions\n{BuildConditionText()}";
+	}
+
+	private string BuildConditionText()
+	{
+		if (_goalConditionLines.Count == 0)
+		{
+			return "No victory conditions reported.";
+		}
+
+		var lines = new List<string>(_goalConditionLines.Count);
+		foreach (var condition in _goalConditionLines)
+		{
+			lines.Add($"- {condition}");
+		}
+
+		return string.Join("\n", lines);
+	}
+
+	private static Rect2 GetScrollTextRect(Vector2 size)
+	{
+		var horizontalInset = size.X * 0.15f;
+		var verticalInset = size.Y * 0.18f;
+		return new Rect2(
+			horizontalInset,
+			verticalInset,
+			size.X - horizontalInset * 2.0f,
+			size.Y - verticalInset * 2.0f
+		);
 	}
 
 	private static bool TryGetTilePosition(int tileIndex, out Vector2 position)
@@ -467,6 +548,20 @@ public partial class TeamGoalPanelView : Control, ITeamGoalPanelView
 		label.VerticalAlignment = VerticalAlignment.Center;
 		label.AddThemeFontSizeOverride("font_size", fontSize);
 		label.AddThemeColorOverride("font_color", fontColor);
+		return label;
+	}
+
+	private static Label CreateWrappedTextLabel(
+		string text,
+		int fontSize,
+		Color fontColor,
+		Vector2 position,
+		Vector2 size,
+		HorizontalAlignment alignment
+	)
+	{
+		var label = CreateTextLabel(text, fontSize, fontColor, position, size, alignment);
+		label.AutowrapMode = TextServer.AutowrapMode.WordSmart;
 		return label;
 	}
 

@@ -709,47 +709,336 @@ public sealed class CybernationRestGameGateway : IGameGateway
 		var name = GetString(activeGoal, "name", "Team Goal");
 		var id = GetInt(activeGoal, "id", 0);
 		var met = GetBool(activeGoal, "met", false);
+		var definition = GetGoalDefinition(id);
+		var statuses = definition.HasValue
+			? BuildGoalConditionStatuses(gameState, definition.Value)
+			: Array.Empty<GoalConditionStatus>();
+		var conditionLines = BuildGoalConditionLines(statuses);
+		var clashNotes = BuildGoalClashNotes(statuses);
+
 		return new TeamGoalStatePayload(
 			name,
-			$"Goal #{id}\nStatus: {(met ? "Met" : "Not met")}",
-			BuildGoalConflictTileIndices(gameState, activeGoal)
+			BuildGoalPreviewDescription(id, met, conditionLines),
+			definition.HasValue
+				? BuildGoalConflictTileIndices(gameState, statuses)
+				: Array.Empty<int>(),
+			conditionLines,
+			definition?.Note ?? "",
+			clashNotes
 		);
 	}
 
-	private static int[] BuildGoalConflictTileIndices(JsonElement gameState, JsonElement activeGoal)
+	private static GoalConditionStatus[] BuildGoalConditionStatuses(JsonElement gameState, GoalDefinition definition)
+	{
+		var statuses = new List<GoalConditionStatus>(definition.Conditions.Length);
+		foreach (var condition in definition.Conditions)
+		{
+			var current = GetGoalConditionCurrentValue(gameState, condition);
+			statuses.Add(new GoalConditionStatus(condition, current, CompareGoalValue(current, condition.Compare, condition.Target)));
+		}
+
+		return statuses.ToArray();
+	}
+
+	private static string[] BuildGoalConditionLines(IReadOnlyList<GoalConditionStatus> statuses)
+	{
+		var lines = new List<string>(statuses.Count);
+		foreach (var status in statuses)
+		{
+			lines.Add(FormatGoalCondition(status.Condition));
+		}
+
+		return lines.ToArray();
+	}
+
+	private static string[] BuildGoalClashNotes(IReadOnlyList<GoalConditionStatus> statuses)
+	{
+		var notes = new List<string>();
+		foreach (var status in statuses)
+		{
+			if (status.IsMet)
+			{
+				continue;
+			}
+
+			notes.Add($"{FormatGoalCondition(status.Condition)} - current {status.Current} (not satisfied)");
+		}
+
+		return notes.ToArray();
+	}
+
+	private static string BuildGoalPreviewDescription(int id, bool met, IReadOnlyList<string> conditionLines)
+	{
+		var builder = new StringBuilder();
+		builder.Append("Goal #").Append(id).Append('\n');
+		builder.Append("Status: ").Append(met ? "Met" : "Not met");
+		if (conditionLines.Count > 0)
+		{
+			builder.Append("\nConditions:");
+			foreach (var condition in conditionLines)
+			{
+				builder.Append('\n').Append(condition);
+			}
+		}
+
+		return builder.ToString();
+	}
+
+	private static int GetGoalConditionCurrentValue(JsonElement gameState, GoalConditionDefinition condition)
+	{
+		if (IsStackConditionType(condition.Type))
+		{
+			return CountGoalStackTiles(gameState, condition);
+		}
+
+		if (!gameState.TryGetProperty("params", out var parameters) || parameters.ValueKind != JsonValueKind.Object)
+		{
+			return 0;
+		}
+
+		return condition.Type switch
+		{
+			"HR" => GetInt(parameters, "humanRelation", 0),
+			"Co" => GetInt(parameters, "cohesion", 0),
+			"Env" => GetInt(parameters, "environment", 0),
+			"Tech" => GetInt(parameters, "technology", 0),
+			"Cy" => GetInt(parameters, "cybernationLevel", 0),
+			_ => 0,
+		};
+	}
+
+	private static int CountGoalStackTiles(JsonElement gameState, GoalConditionDefinition condition)
+	{
+		if (!gameState.TryGetProperty("board", out var board) || board.ValueKind != JsonValueKind.Array)
+		{
+			return 0;
+		}
+
+		var count = 0;
+		foreach (var tile in board.EnumerateArray())
+		{
+			var position = GetInt(tile, "position", 0);
+			if (!GoalPositionMatches(position, condition.Position))
+			{
+				continue;
+			}
+
+			var type = GetString(tile, "type", "Wild");
+			if (NormalizeStackType(type) == condition.Type)
+			{
+				count++;
+			}
+		}
+
+		return count;
+	}
+
+	private static int[] BuildGoalConflictTileIndices(JsonElement gameState, IReadOnlyList<GoalConditionStatus> statuses)
 	{
 		if (!gameState.TryGetProperty("board", out var board) || board.ValueKind != JsonValueKind.Array)
 		{
 			return [];
 		}
 
-		var goalId = GetInt(activeGoal, "id", -1);
-		var conflicts = new List<int>();
-		foreach (var tile in board.EnumerateArray())
+		var conflicts = new HashSet<int>();
+		foreach (var status in statuses)
 		{
-			var index = GetInt(tile, "position", conflicts.Count);
-			var type = GetString(tile, "type", "Wild");
-			if (TileConflictsWithGoal(goalId, type))
+			if (status.IsMet || !IsStackConditionType(status.Condition.Type))
 			{
-				conflicts.Add(index);
+				continue;
+			}
+
+			foreach (var tile in board.EnumerateArray())
+			{
+				var index = GetInt(tile, "position", 0);
+				if (!GoalPositionMatches(index, status.Condition.Position))
+				{
+					continue;
+				}
+
+				var type = NormalizeStackType(GetString(tile, "type", "Wild"));
+				var matchesType = type == status.Condition.Type;
+				if (IsGoalTileConflict(status, matchesType))
+				{
+					conflicts.Add(index);
+				}
 			}
 		}
 
-		return conflicts.ToArray();
+		var conflictList = new List<int>(conflicts);
+		conflictList.Sort();
+		return conflictList.ToArray();
 	}
 
-	private static bool TileConflictsWithGoal(int goalId, string effectiveStackType)
+	private static bool IsGoalTileConflict(GoalConditionStatus status, bool matchesType)
 	{
-		var type = NormalizeStackType(effectiveStackType);
-		return goalId switch
+		return status.Condition.Compare switch
 		{
-			0 => type != "Wild",
-			1 => type == "Wild",
-			3 => type == "DevA",
-			4 => type == "Waste",
-			5 => type != "Waste",
-			9 => type == "DevB",
+			"EQ" when status.Condition.Target == 0 => matchesType,
+			"EQ" => status.Current < status.Condition.Target ? !matchesType : matchesType,
+			"GE" or "GT" => !matchesType,
+			"LE" or "LT" => matchesType,
+			"NE" => matchesType,
 			_ => false,
+		};
+	}
+
+	private static bool CompareGoalValue(int lhs, string compare, int rhs)
+	{
+		return compare switch
+		{
+			"GT" => lhs > rhs,
+			"GE" => lhs >= rhs,
+			"EQ" => lhs == rhs,
+			"LE" => lhs <= rhs,
+			"LT" => lhs < rhs,
+			"NE" => lhs != rhs,
+			_ => lhs == rhs,
+		};
+	}
+
+	private static string FormatGoalCondition(GoalConditionDefinition condition)
+	{
+		var line = $"{condition.Type} {condition.Compare} {condition.Target}";
+		if (!string.IsNullOrWhiteSpace(condition.Position))
+		{
+			line += $" at {condition.Position}";
+		}
+
+		return line;
+	}
+
+	private static bool GoalPositionMatches(int position, string? filter)
+	{
+		return filter switch
+		{
+			null or "" => true,
+			"inner" => position == 0,
+			"middle" => position >= 1 && position <= 6,
+			"outer" => position >= 7 && position <= 10,
+			_ => false,
+		};
+	}
+
+	private static bool IsStackConditionType(string type)
+	{
+		return type is "Wild" or "Waste" or "DevA" or "DevB";
+	}
+
+	private static GoalDefinition? GetGoalDefinition(int id)
+	{
+		return id switch
+		{
+			0 => new GoalDefinition(
+				0,
+				"Restore and Rewild",
+				"All 11 board tiles must be Wild, and Human Relation must be at least 11.",
+				new[]
+				{
+					new GoalConditionDefinition("Wild", "EQ", 11),
+					new GoalConditionDefinition("HR", "GE", 11),
+				}
+			),
+			1 => new GoalDefinition(
+				1,
+				"Dominate the Land",
+				"There must be no Wild tiles on the board, and Cohesion must be at least 10.",
+				new[]
+				{
+					new GoalConditionDefinition("Wild", "EQ", 0),
+					new GoalConditionDefinition("Co", "GE", 10),
+				}
+			),
+			2 => new GoalDefinition(
+				2,
+				"Prepare for the Worst",
+				"The board must keep at least 2 Wild tiles and at least 3 DevA tiles, while Cybernation Level reaches at least 7.",
+				new[]
+				{
+					new GoalConditionDefinition("Wild", "GE", 2),
+					new GoalConditionDefinition("DevA", "GE", 3),
+					new GoalConditionDefinition("Cy", "GE", 7),
+				}
+			),
+			3 => new GoalDefinition(
+				3,
+				"Each to their Own",
+				"The board must contain at least 6 DevB tiles, no DevA tiles, and Cybernation Level must be exactly 0.",
+				new[]
+				{
+					new GoalConditionDefinition("DevB", "GE", 6),
+					new GoalConditionDefinition("DevA", "EQ", 0),
+					new GoalConditionDefinition("Cy", "EQ", 0),
+				}
+			),
+			4 => new GoalDefinition(
+				4,
+				"Reconnect",
+				"There must be no Waste tiles, and Human Relation, Technology, and Environment must each be at least 12.",
+				new[]
+				{
+					new GoalConditionDefinition("Waste", "EQ", 0),
+					new GoalConditionDefinition("HR", "GE", 12),
+					new GoalConditionDefinition("Tech", "GE", 12),
+					new GoalConditionDefinition("Env", "GE", 12),
+				}
+			),
+			5 => new GoalDefinition(
+				5,
+				"Ransack",
+				"All 11 board tiles must be Waste, while Human Relation, Technology, and Environment must each be at least 5.",
+				new[]
+				{
+					new GoalConditionDefinition("Waste", "EQ", 11),
+					new GoalConditionDefinition("HR", "GE", 5),
+					new GoalConditionDefinition("Tech", "GE", 5),
+					new GoalConditionDefinition("Env", "GE", 5),
+				}
+			),
+			6 => new GoalDefinition(
+				6,
+				"Equity",
+				"The outer ring must contain exactly 4 DevA tiles, the middle ring must contain at least 3 Wild tiles, and Cybernation Level must be at least 4.",
+				new[]
+				{
+					new GoalConditionDefinition("DevA", "EQ", 4, "outer"),
+					new GoalConditionDefinition("Wild", "GE", 3, "middle"),
+					new GoalConditionDefinition("Cy", "GE", 4),
+				}
+			),
+			7 => new GoalDefinition(
+				7,
+				"Inequity",
+				"The inner tile must be DevA, the outer ring must contain at least 3 Wild tiles, and Cybernation Level must be at least 4.",
+				new[]
+				{
+					new GoalConditionDefinition("DevA", "EQ", 1, "inner"),
+					new GoalConditionDefinition("Wild", "GE", 3, "outer"),
+					new GoalConditionDefinition("Cy", "GE", 4),
+				}
+			),
+			8 => new GoalDefinition(
+				8,
+				"Tomorrow through Tech",
+				"The inner tile must be DevB, and Cohesion must be at least 15.",
+				new[]
+				{
+					new GoalConditionDefinition("DevB", "EQ", 1, "inner"),
+					new GoalConditionDefinition("Co", "GE", 15),
+				}
+			),
+			9 => new GoalDefinition(
+				9,
+				"Back to Nature",
+				"There must be no DevB tiles, the board must contain at least 6 Wild tiles, and Cohesion must be at least 20.",
+				new[]
+				{
+					new GoalConditionDefinition("DevB", "EQ", 0),
+					new GoalConditionDefinition("Wild", "GE", 6),
+					new GoalConditionDefinition("Co", "GE", 20),
+				}
+			),
+			_ => null,
 		};
 	}
 
@@ -764,6 +1053,26 @@ public sealed class CybernationRestGameGateway : IGameGateway
 			_ => stackType,
 		};
 	}
+
+	private readonly record struct GoalDefinition(
+		int Id,
+		string Name,
+		string Note,
+		GoalConditionDefinition[] Conditions
+	);
+
+	private readonly record struct GoalConditionDefinition(
+		string Type,
+		string Compare,
+		int Target,
+		string? Position = null
+	);
+
+	private readonly record struct GoalConditionStatus(
+		GoalConditionDefinition Condition,
+		int Current,
+		bool IsMet
+	);
 
 	private static InfoSummaryStatePayload BuildInfoSummary(
 		JsonElement gameState,
